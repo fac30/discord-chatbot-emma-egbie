@@ -1,0 +1,29 @@
+{
+  "extends": ["eslint:recommended", "plugin:prettier/recommended"],
+  "env": {
+    "node": true,
+    "es6": true
+  },
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "script"
+  },
+  "rules": {
+    "brace-style": ["error", "stroustrup", { "allowSingleLine": true }],
+    "curly": ["error", "multi-line", "consistent"],
+    "handle-callback-err": "off",
+    "no-console": "off",
+    "no-empty-function": "error",
+    "no-floating-decimal": "error",
+    "no-inline-comments": "error",
+    "no-lonely-if": "error",
+    "no-multi-spaces": "error",
+    "no-shadow": ["error", { "allow": ["err", "resolve", "reject"] }],
+    "no-trailing-spaces": "error",
+    "no-var": "error",
+    "no-unused-vars": ["warn", { "argsIgnorePattern": "^_" }],
+    "prefer-const": "error",
+    "semi": ["error", "always"]
+  },
+  "plugins": ["prettier"]
+}
