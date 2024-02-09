@@ -33,11 +33,13 @@ class BotManager {
     this._serverID = server_ID;
     /** @private */
     this._initialized = false;
+    /** @private */
+    this._lastMessageTime;
 
     // hook up event listeners here
     this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
     this._client.on(Events.GuildMemberAdd, this._announceNewMember.bind(this));
-    this._client.on(Events.GuildBanRemove, this._announceMemberLeave.bind(this));
+    this._client.on(Events.GuildMemberRemove, this._announceMemberLeave.bind(this));
   }
 
   /**
@@ -68,13 +70,20 @@ class BotManager {
 
   /**
    * Runs whenever a message is written in the chat
+   * Doesn't reply to messages all the time, only if it hasn't replied in the last 3 seconds.
    * @param { Message } message
    * @private
    */
   _onMessageCreate(message) {
     const author = message.author.id;
+    const now = Date.now();
+
     if (author !== this._client.application.id) {
-      this._sendToChannel(message.channel, "hello");
+      // Check if enough time has passed since the last message
+      if (!this._lastMessageTime || now - this._lastMessageTime >= 3000) {
+        this._sendToChannel(message.channel, "hello");
+        this._lastMessageTime = now;
+      }
     }
   }
 
@@ -85,7 +94,7 @@ class BotManager {
    */
   _announceNewMember(member) {
     const message = `Welcome to the server, ${member.user.tag}!`;
-    this._sendToChannel(member.channel, message);
+    this._sendToChannel(this.defaultChannel, message);
   }
 
   /**
@@ -95,7 +104,7 @@ class BotManager {
    */
   _announceMemberLeave(member) {
     const message = `${member.user.tag} has left the server`;
-    this._sendToChannel(member.channel, message);
+    this._sendToChannel(this.defaultChannel, message);
   }
 
   /**
@@ -106,12 +115,13 @@ class BotManager {
    */
   _sendToChannel(channel, message) {
     if (!channel) return console.error("Channel not found!!");
+
     channel.send(message);
   }
 
   get defaultChannel() {
     const guild = this._client.guilds.cache.get(this._serverID);
-    return guild?.systemChannel;
+    return guild && guild.id === this._serverID ? guild?.systemChannel : null;
   }
 }
 
