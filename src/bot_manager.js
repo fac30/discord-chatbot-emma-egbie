@@ -3,6 +3,7 @@ const {
   GatewayIntentBits,
   Events,
   TextChannel,
+  Message,
 } = require("discord.js");
 
 /**
@@ -47,9 +48,23 @@ class BotManager {
         const defaultChannel = guild.systemChannel;
         const msg = `Hello everyone! I'm the ${readyClient.user.displayName}, now online and ready to chat.`;
         this._sendToChannel(defaultChannel, msg);
+
+        // hook up event listeners here
+        this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
       });
     }
     this._client.login(this._discordBotToken);
+  }
+
+  /**
+   *
+   * @param { Message } message
+   */
+  _onMessageCreate(message) {
+    const author = message.author.id;
+    if (author !== this._client.application.id) {
+      this._sendToChannel(message.channel, "hello");
+    }
   }
 
   /**
@@ -93,7 +108,7 @@ class BotManager {
    * @private
    */
   _sendToChannel(channel, message) {
-    if (!channel) return console.error("Default channel not found!!");
+    if (!channel) return console.error("Channel not found!!");
     channel.send(message);
   }
 }
