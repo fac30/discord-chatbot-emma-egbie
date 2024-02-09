@@ -1,130 +1,101 @@
-const { Client,  GatewayIntentBits } = require('discord.js');
-
+const {
+  Client,
+  GatewayIntentBits,
+  Events,
+  TextChannel,
+} = require("discord.js");
 
 /**
  * Represents a manager for a Discord bot, responsible for initializing the bot,
  * handling events such as new member announcements, and sending messages to Discord channels.
  */
 class BotManager {
+  /**
+   * Constructs a new BotManager instance with the specified Discord bot token and server ID.
+   * @param {string} discordBotToken - The Discord bot token used for authentication.
+   * @param {string} server_ID - The ID of the server where the bot will operate.
+   */
+  constructor(discordBotToken, server_ID) {
+    /** @private */
+    this._client = new Client({
+      intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers,
+      ],
+    });
+    /** @private */
+    this._discordBotToken = discordBotToken;
+    /** @private */
+    this._serverID = server_ID;
+    /** @private */
+    this._initialized = false;
+  }
 
-    /**
-     * Constructs a new BotManager instance with the specified Discord bot token and server ID.
-     * @param {string} discordBotToken - The Discord bot token used for authentication.
-     * @param {string} server_ID - The ID of the server where the bot will operate.
-     */
-    constructor(discordBotToken, server_ID) {
-        // Initialize the Discord client with necessary intents
-        this._client = new Client({
-            intents: [
-                GatewayIntentBits.Guilds,
-                GatewayIntentBits.GuildMessages,
-                GatewayIntentBits.MessageContent,
-                GatewayIntentBits.GuildMembers,
-            ],
-        });
+  /**
+   * Logs the bot in.
+   * Sends a greeting message to the system channel of the server when the bot connects to Discord for the first time.
+   */
+  login() {
+    if (!this._initialized) {
+      this._client.once(Events.ClientReady, (readyClient) => {
+        const guild = this._client.guilds.cache.get(this._serverID);
+        if (!guild) return console.error("Server (guild) not found.");
 
-        this._discordBotToken = discordBotToken;
-        this._serverID        = server_ID;
-        this._initialized     = false;
+        this._initialized = true;
+        const defaultChannel = guild.systemChannel;
+        const msg = `Hello everyone! I'm the ${readyClient.user.displayName}, now online and ready to chat.`;
+        this._sendToChannel(defaultChannel, msg);
+      });
     }
+    this._client.login(this._discordBotToken);
+  }
 
-    /**
-     * Sets the Discord bot token.
-     * @param {string} discordToken - The new Discord bot token to set.
-     */
-    setToken(discordToken) {
-        this._discordBotToken = discordToken;
-    }
+  /**
+   * Listens for the 'guildMemberAdd' event, triggered when a new member joins the server,
+   * and sends a welcome message to the system channel announcing the new member.
+   */
+  announceNewMember() {
+    this._handleGuildEventHelperFunction(Events.GuildMemberAdd, (member) => {
+      return `Welcome to the server, ${member}!`;
+    });
+  }
 
-    /**
-     * Gets the current Discord bot token.
-     * @returns {string} The Discord bot token.
-     */
-    getToken() {
-        return this._discordBotToken;
-    }
+  /**
+   * Listens for the 'guildMemberRemove' event, triggered when a member leaves the server,
+   * and sends a message to the system channel announcing the member's departure.
+   */
+  announceMemberLeave() {
+    this._handleGuildEventHelperFunction(Events.GuildMemberRemove, (member) => {
+      return `${member.user.tag} has left the server`;
+    });
+  }
 
-    /**
-     * Initializes the bot (once) so that when the bot connects to Discord for the first time,
-     * it sends a greeting message to the system channel of the server, announcing the bot's presence.
-     */
-    init() {
-        if (!this._initialized) {
-            this._client.once('ready', readyClient => {
+  /**
+   * This helper function is called internally by methods responsible for handling specific member related guild events.
+   * @param { Events } guildMemberString - The name of the guild event to handle (e.g., 'guildMemberAdd', 'guildMemberRemove').
+   * @param {Function} msgBuilder - A function that dynamically constructs the message for the event.
+   * @private
+   */
+  _handleGuildEventHelperFunction(guildMemberString, msgBuilder) {
+    this._client.on(guildMemberString, (member) => {
+      const channel = member.guild.systemChannel;
+      const msg = msgBuilder(member);
+      this._sendToChannel(channel, msg);
+    });
+  }
 
-                const guild = this._client.guilds.cache.get(this._serverID);
-                if (!guild) return console.error("Server (guild) not found.");
-
-                this._initialized    = true;
-                const defaultChannel = guild.systemChannel;
-                const msg            = `Hello everyone! I'm the ${readyClient.user.displayName}, now online and ready to serve.`;
-              
-
-                // Comment this out on your local computer (at least in development) because each time you change a line in the code or make
-                // changes the server restarts due to the change which means the bot announces itself again to the server
-                this._sendToChannel(defaultChannel, msg);
-                
-            });
-        }
-    }
-
-    /**
-     * Listens for the 'guildMemberAdd' event, triggered when a new member joins the server,
-     * and sends a welcome message to the system channel announcing the new member.
-     */
-    announceNewMember() {
-        const guildMemberEvent = "guildMemberAdd"; // Add member event
-
-        this._handleGuildEventHelperFunction(guildMemberEvent, (member) => {
-            return `Welcome to the server, ${member}!`;
-        });
-    }
-
-    /**
-     * Listens for the 'guildMemberRemove' event, triggered when a member leaves the server,
-     * and sends a message to the system channel announcing the member's departure.
-     */
-    announceMemberLeave() {
-        const guildMemberEvent = "guildMemberRemove"; // Remove member event
-
-        this._handleGuildEventHelperFunction(guildMemberEvent, (member) => {
-            return `${member.user.tag} has left the server`;
-        });
-    }
-
-   /**
-     * This helper function is called internally by methods responsible for handling specific guild events.
-     * The method does all the heavy lifting by abstracting how the event is handled and providing an easier-to-use interface.
-     * @param {string} guildMemberString - The name of the guild event to handle (e.g., 'guildMemberAdd', 'guildMemberRemove').
-     * @param {Function} msgBuilder - A function that dynamically constructs the message for the event.
-     * @private
-     */
-    _handleGuildEventHelperFunction(guildMemberString, msgBuilder) {
-        this._client.on(guildMemberString, member => {
-
-            const channel = member.guild.systemChannel;
-            const msg     = msgBuilder(member);
-            this._sendToChannel(channel, msg);
-        });
-    }
-
-    /**
-     * Sends a message to the specified Discord server channel.
-     * @param {TextChannel} channel - The Discord server channel to send the message to.
-     * @param {string} message - The message content to send.
-     */
-    _sendToChannel(channel, message) {
-        if (!channel) return console.error("Default channel not found!!");
-        channel.send(message);
-    }
-
-    /**
-     * Logs in the bot using the specified Discord bot token.
-     */
-    login() {
-        this._client.login(this._discordBotToken);
-    }
+  /**
+   * Sends a message to the specified Discord server channel.
+   * @param {TextChannel} channel - The Discord server channel to send the message to.
+   * @param {string} message - The message content to send.
+   * @private
+   */
+  _sendToChannel(channel, message) {
+    if (!channel) return console.error("Default channel not found!!");
+    channel.send(message);
+  }
 }
-
 
 module.exports = BotManager;
