@@ -4,6 +4,7 @@ const {
   Events,
   TextChannel,
   Message,
+  GuildMember,
 } = require("discord.js");
 
 /**
@@ -32,6 +33,11 @@ class BotManager {
     this._serverID = server_ID;
     /** @private */
     this._initialized = false;
+
+    // hook up event listeners here
+    this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
+    this._client.on(Events.GuildMemberAdd, this._announceNewMember.bind(this));
+    this._client.on(Events.GuildBanRemove, this._announceMemberLeave.bind(this));
   }
 
   /**
@@ -39,26 +45,31 @@ class BotManager {
    * Sends a greeting message to the system channel of the server when the bot connects to Discord for the first time.
    */
   login() {
-    if (!this._initialized) {
-      this._client.once(Events.ClientReady, (readyClient) => {
-        const guild = this._client.guilds.cache.get(this._serverID);
-        if (!guild) return console.error("Server (guild) not found.");
-
-        this._initialized = true;
-        const defaultChannel = guild.systemChannel;
-        const msg = `Hello everyone! I'm the ${readyClient.user.displayName}, now online and ready to chat.`;
-        this._sendToChannel(defaultChannel, msg);
-
-        // hook up event listeners here
-        this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
-      });
+    if (this._initialized) {
+      return;
     }
+
+    this._client.once(Events.ClientReady, () => {
+      this._initialized = true;
+      this._announcePresence();
+    });
+
     this._client.login(this._discordBotToken);
   }
 
   /**
-   *
+   * Announces the bot's presence by sending a message in the default channel
+   * @private
+   */
+  _announcePresence() {
+    const msg = `Hello everyone! I'm the ${this._client.user.displayName}, now online and ready to chat.`;
+    this._sendToChannel(this.defaultChannel, msg);
+  }
+
+  /**
+   * Runs whenever a message is written in the chat
    * @param { Message } message
+   * @private
    */
   _onMessageCreate(message) {
     const author = message.author.id;
@@ -68,37 +79,23 @@ class BotManager {
   }
 
   /**
-   * Listens for the 'guildMemberAdd' event, triggered when a new member joins the server,
-   * and sends a welcome message to the system channel announcing the new member.
-   */
-  announceNewMember() {
-    this._handleGuildEventHelperFunction(Events.GuildMemberAdd, (member) => {
-      return `Welcome to the server, ${member}!`;
-    });
-  }
-
-  /**
-   * Listens for the 'guildMemberRemove' event, triggered when a member leaves the server,
-   * and sends a message to the system channel announcing the member's departure.
-   */
-  announceMemberLeave() {
-    this._handleGuildEventHelperFunction(Events.GuildMemberRemove, (member) => {
-      return `${member.user.tag} has left the server`;
-    });
-  }
-
-  /**
-   * This helper function is called internally by methods responsible for handling specific member related guild events.
-   * @param { Events } guildMemberString - The name of the guild event to handle (e.g., 'guildMemberAdd', 'guildMemberRemove').
-   * @param {Function} msgBuilder - A function that dynamically constructs the message for the event.
+   * Sends a welcome message to the system channel announcing the new member.
+   * @param { GuildMember } member
    * @private
    */
-  _handleGuildEventHelperFunction(guildMemberString, msgBuilder) {
-    this._client.on(guildMemberString, (member) => {
-      const channel = member.guild.systemChannel;
-      const msg = msgBuilder(member);
-      this._sendToChannel(channel, msg);
-    });
+  _announceNewMember(member) {
+    const message = `Welcome to the server, ${member.user.tag}!`;
+    this._sendToChannel(member.channel, message);
+  }
+
+  /**
+   * Sends a message to the system channel announcing the member's departure.
+   * @param { GuildMember } member
+   * @private
+   */
+  _announceMemberLeave(member) {
+    const message = `${member.user.tag} has left the server`;
+    this._sendToChannel(member.channel, message);
   }
 
   /**
@@ -110,6 +107,11 @@ class BotManager {
   _sendToChannel(channel, message) {
     if (!channel) return console.error("Channel not found!!");
     channel.send(message);
+  }
+
+  get defaultChannel() {
+    const guild = this._client.guilds.cache.get(this._serverID);
+    return guild?.systemChannel;
   }
 }
 

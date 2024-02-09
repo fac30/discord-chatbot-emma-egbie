@@ -1,4 +1,4 @@
-const BotManager = require("./bot_manager.js");
+const BotManager = require("./BotManager.js");
 
 const openAi = require("openai");
 const dotenv = require("dotenv").config();
@@ -10,5 +10,3 @@ const SERVER_ID = dotenv.parsed.SERVER_ID;
 const discordBot = new BotManager(DISCORD_BOT_TOKEN, SERVER_ID);
 
 discordBot.login();
-discordBot.announceNewMember();
-discordBot.announceMemberLeave();
