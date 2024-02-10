@@ -83,16 +83,17 @@ class BotManager {
     const content = message.content;
     const now = Date.now();
 
-    console.log(message.author);
     const isSameAuthor = author === this._client.application.id;
     const hasTalkedRecently = this._lastMessageTime && now - this._lastMessageTime < 3000;
     if (isSameAuthor || hasTalkedRecently) {
       return;
     }
 
-    this._openAi.prompt(content).then((reply) => {
-      this._sendToChannel(message.channel, reply);
-      this._lastMessageTime = now;
+    this._openAi.prompt(content, message.author.username).then((reply) => {
+      if (reply.length) {
+        this._sendToChannel(message.channel, reply);
+        this._lastMessageTime = now;
+      }
     });
   }
 
