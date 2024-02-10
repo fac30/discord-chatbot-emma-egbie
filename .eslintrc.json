@@ -9,6 +9,7 @@
     "sourceType": "script"
   },
   "rules": {
+    "no-extra-boolean-cast": "off",
     "curly": ["error", "multi-line", "consistent"],
     "handle-callback-err": "off",
     "no-console": "off",
