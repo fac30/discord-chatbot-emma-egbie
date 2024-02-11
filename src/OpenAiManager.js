@@ -1,3 +1,4 @@
+
 const { OpenAI } = require("openai");
 
 // These prompts happen before each message under the 'system' role
@@ -18,6 +19,7 @@ class OpenAiManager {
     this._openAi = new OpenAI({ apiKey });
     this._cache = {};
     this.name = "discord chatbot";
+    this._lastMessageTime = null;
   }
 
   /**
@@ -28,57 +30,97 @@ class OpenAiManager {
    * @returns
    */
   async prompt(userPrompt, user = "default") {
+
     // if we previously have a response, we return it instead
     if (this._cache[user]?.[userPrompt] !== undefined) {
       return this._cache[user][userPrompt];
     }
 
-    const now = Date.now();
-    // we don't submit a prompt unless it's been more than 3 seconds.
-    if (this._lastMessageTime && now - this._lastMessageTime < 3000) {
-      // maybe we can add some default 'please wait' thingy here
+    const timeNow       = Date.now();
+    const waitTimeLimit = 3000;      //  variable name so it does look like a "magic number" known in programming
+
+   
+    //we don't submit a prompt unless it's been more than 3 seconds.
+    if (this._lastMessageTime && (timeNow - this._lastMessageTime < waitTimeLimit)) {
       return "";
     }
-    try {
-      const messages = [
-        { role: "system", content: `Your name is ${this.name} and ${this.name} only. ` },
-        { role: "system", content: systemPrompts.join(" ") },
-        { role: "assistant", content: `This user is called ${user}. Do NOT mention their name.",` },
-      ];
 
-      const previousChats = this._getUserChats(user);
+    const messages  = this._constructMessage(userPrompt, user);
+    const result    = await this._generateReply(messages);
 
-      // we provide the chat history of a user if they exist.
-      if (previousChats) {
-        messages.push({
-          role: "assistant",
-          content: `The previous conversations with this user are: ${previousChats}. Don't greet them again.`,
-        });
-      }
+    this._updateCache(user, userPrompt, result);
+    this._updateLastMessageTime(timeNow);
 
-      messages.push({
-        role: "user",
-        content: `${user} writes: ${userPrompt}.`,
-      });
-
-      const completion = await this._openAi.chat.completions.create({
-        messages,
-        model: "gpt-3.5-turbo",
-      });
-
-      const result = completion.choices[0].message.content;
-      if (!this._cache[user]) {
-        this._cache[user] = {};
-      }
-      this._cache[user][userPrompt] = result;
-      this._lastMessageTime = now;
-      return result;
-    } catch (e) {
-      // maybe we want to throw this error instead of catching it?
-      // or return some error text?
-      return "";
-    }
   }
+
+  /**
+   * Builds an array of messages to send to OpenAI based on the user prompt and previous chats.
+   * @param {string} userPrompt - The prompt provided by the user.
+   * @param {string} user - The user's identifier.
+   * @returns {Array<{ role: string, content: string }>} An array of messages for OpenAI.
+   */
+  _constructMessage(userPrompt, user) {
+
+    const previousChats = this._getUserChats(user);
+
+    const messages = [
+      { role: "system", content: `Your name is ${this.name} and ${this.name} only. ` },
+      { role: "system", content: systemPrompts.join(" ") },
+      { role: "assistant", content: `This user is called ${user}. Do NOT mention their name.",` },
+    ];
+
+    // we provide the chat history of a user if they exist.
+    if (previousChats) {
+      messages.push({
+        role: "assistant",
+        content: `The previous conversations with this user are: ${previousChats}. Don't greet them again.`,
+      });
+    }
+
+    messages.push({
+      role: "user",
+      content: `${user} writes: ${userPrompt}.`,
+    });
+
+    return messages
+  }
+
+  /**
+   * Generates a reply from OpenAI based on the provided messages.
+   * @param {Array<{ role: string, content: string }>} messages - The messages to send to OpenAI.
+   * @returns {Promise<string>} A promise that resolves to the generated response from OpenAI.
+   */  
+  async _generateReply(messages) {
+    const completion = await this._openAi.chat.completions.create({
+      messages,
+      model: "gpt-3.5-turbo",
+    });
+
+    return completion.choices[0].message.content || '';
+  }
+
+
+  /**
+   * Updates the cache with the result of a prompt.
+   * @param {string} user - The user's identifier.
+   * @param {string} userPrompt - The prompt provided by the user.
+   * @param {string} result - The generated response from OpenAI.
+   */
+  _updateCache(user, userPrompt, result) {
+    if (!this._cache[user]) {
+      this._cache[user] = {};
+    }
+    this._cache[user][userPrompt] = result;
+
+  }
+
+  /**
+   * Updates the last message time to the current timestamp.
+  */
+  _updateLastMessageTime(currentTime) {
+    this._lastMessageTime = currentTime;
+  }
+
 
   /**
    * Gets all the user chat history
@@ -101,3 +143,4 @@ class OpenAiManager {
 }
 
 module.exports = OpenAiManager;
+
