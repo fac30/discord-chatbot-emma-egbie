@@ -87,7 +87,7 @@ class BotManager {
     const hasBeenMentioned   = message.mentions.has(this._client.user.id);
     const isSameAuthor       = author === this._client.application.id;
     const currentTimeNow     = Date.now();
-    const waitTimeLimit      = 3000       // assigned name to advoid the dreaded "magin number" know in programming
+    const waitTimeLimit      = 3000       // assigned name to avoid the dreaded "magic number" know in programming
     const hasTalkedRecently  = this._lastMessageTime && currentTimeNow - this._lastMessageTime < waitTimeLimit;
 
 
@@ -128,11 +128,15 @@ class BotManager {
  * @param {string} message - The content of the message to be sent.
  */
   _sendDirectMessageToUser(userID, message) {
-
-    const user = this._client.users.cache.get(userID);
-
-    if (user) {
-      user.send(message)
+   
+    const user = this._client.users.cache?.get(userID);
+  
+    if (!user) {
+      console.log(`User with ID ${userID} does not exist.`);
+      return;
+   }
+    
+    user.send(message)
         .then(() => {
           console.log("The message was sent successfully.");
         })
@@ -140,8 +144,7 @@ class BotManager {
           console.log("Failed to send the message.");
         });
     }
-  }
-
+  
 
   /**
    * Queries the OpenAI API with the provided prompt and sends the response to the message channel.
@@ -152,12 +155,14 @@ class BotManager {
  */
   _queryOpenAi(prompt, message, currentTimeStamp) {
 
+
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
-      if (reply.length) {
+      if (reply && reply.length) {
         this._sendToChannel(message.channel, `<@${message.author.id}> ${reply}`);
         this._lastMessageTime = currentTimeStamp;
       }
     });
+    
   }
 
   /**

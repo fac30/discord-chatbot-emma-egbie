@@ -47,7 +47,6 @@ class OpenAiManager {
 
     const messages  = this._constructMessage(userPrompt, user);
     const result    = await this._generateReply(messages);
-
     this._updateCache(user, userPrompt, result);
     this._updateLastMessageTime(timeNow);
 
@@ -91,13 +90,20 @@ class OpenAiManager {
    * @returns {Promise<string>} A promise that resolves to the generated response from OpenAI.
    */  
   async _generateReply(messages) {
-    const completion = await this._openAi.chat.completions.create({
-      messages,
-      model: "gpt-3.5-turbo",
-    });
+    try {
+        const completion = await this._openAi.chat.completions.create({
+            messages,
+            model: "gpt-3.5-turbo",
+        });
 
-    return completion.choices[0].message.content || '';
-  }
+        return completion.choices[0].message.content || '';
+    } catch (error) {
+        console.error("Error while generating reply:", error);
+        return '';
+      
+    }
+}
+
 
 
   /**
