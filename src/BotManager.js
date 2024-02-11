@@ -81,17 +81,26 @@ class BotManager {
   _onMessageCreate(message) {
     const author = message.author.id;
     const content = message.content;
-    const now = Date.now();
 
+    const hasBeenMentioned = message.mentions.has(this._client.user.id);
     const isSameAuthor = author === this._client.application.id;
+
+    const now = Date.now();
     const hasTalkedRecently = this._lastMessageTime && now - this._lastMessageTime < 3000;
-    if (isSameAuthor || hasTalkedRecently) {
+
+    /**
+     * We don't send a message if:
+     * - we sent the last message
+     * - we haven't been mentioned in the last message
+     * - we already replied in the last 3 seconds
+     */
+    if (isSameAuthor || hasTalkedRecently || !hasBeenMentioned) {
       return;
     }
 
     this._openAi.prompt(content, message.author.username).then((reply) => {
       if (reply.length) {
-        this._sendToChannel(message.channel, reply);
+        this._sendToChannel(message.channel, `<@${message.author.id}> ${reply}`);
         this._lastMessageTime = now;
       }
     });

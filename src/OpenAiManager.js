@@ -1,10 +1,12 @@
 const { OpenAI } = require("openai");
 
+// These prompts happen before each message under the 'system' role
 const systemPrompts = [
   "You are a helpful assistant.",
   "You try to give the shortest but friendliest reply possible.",
   "You are in a chatroom on discord, and you try to answer each user's question(s) individually.",
   "You may or may not have access to the user's previous chats.",
+  "Do not refer to anyone by their name under any circumstances, unless it's very relevant to the prompt.",
 ];
 
 /**
@@ -41,19 +43,23 @@ class OpenAiManager {
       const messages = [
         { role: "system", content: `Your name is ${this.name} and ${this.name} only. ` },
         { role: "system", content: systemPrompts.join(" ") },
-        { role: "assistant", content: `This user is called ${user}.` },
+        { role: "assistant", content: `This user is called ${user}. Do NOT mention their name.",` },
       ];
 
       const previousChats = this._getUserChats(user);
 
+      // we provide the chat history of a user if they exist.
       if (previousChats) {
         messages.push({
           role: "assistant",
-          content: `The previous conversations with this user are: ${previousChats}`,
+          content: `The previous conversations with this user are: ${previousChats}. Don't greet them again.`,
         });
       }
 
-      messages.push({ role: "user", content: `${user} writes: ${userPrompt}` });
+      messages.push({
+        role: "user",
+        content: `${user} writes: ${userPrompt}.`,
+      });
 
       const completion = await this._openAi.chat.completions.create({
         messages,
