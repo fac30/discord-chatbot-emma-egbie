@@ -6,6 +6,7 @@ const {
   Message,
   GuildMember,
 } = require("discord.js");
+const OpenAiManager = require("./OpenAiManager");
 
 /**
  * Represents a manager for a Discord bot, responsible for initializing the bot,
@@ -17,7 +18,7 @@ class BotManager {
    * @param {string} discordBotToken - The Discord bot token used for authentication.
    * @param {string} server_ID - The ID of the server where the bot will operate.
    */
-  constructor(discordBotToken, server_ID) {
+  constructor(discordBotToken, server_ID, openai_KEY) {
     /** @private */
     this._client = new Client({
       intents: [
@@ -27,6 +28,8 @@ class BotManager {
         GatewayIntentBits.GuildMembers,
       ],
     });
+
+    this._openAi = new OpenAiManager(openai_KEY);
     /** @private */
     this._discordBotToken = discordBotToken;
     /** @private */
@@ -53,6 +56,7 @@ class BotManager {
 
     this._client.once(Events.ClientReady, () => {
       this._initialized = true;
+      this._openAi.setName(this._client.user.displayName);
       this._announcePresence();
     });
 
@@ -76,15 +80,30 @@ class BotManager {
    */
   _onMessageCreate(message) {
     const author = message.author.id;
-    const now = Date.now();
+    const content = message.content;
 
-    if (author !== this._client.application.id) {
-      // Check if enough time has passed since the last message
-      if (!this._lastMessageTime || now - this._lastMessageTime >= 3000) {
-        this._sendToChannel(message.channel, "hello");
+    const hasBeenMentioned = message.mentions.has(this._client.user.id);
+    const isSameAuthor = author === this._client.application.id;
+
+    const now = Date.now();
+    const hasTalkedRecently = this._lastMessageTime && now - this._lastMessageTime < 3000;
+
+    /**
+     * We don't send a message if:
+     * - we sent the last message
+     * - we haven't been mentioned in the last message
+     * - we already replied in the last 3 seconds
+     */
+    if (isSameAuthor || hasTalkedRecently || !hasBeenMentioned) {
+      return;
+    }
+
+    this._openAi.prompt(content, message.author.username).then((reply) => {
+      if (reply.length) {
+        this._sendToChannel(message.channel, `<@${message.author.id}> ${reply}`);
         this._lastMessageTime = now;
       }
-    }
+    });
   }
 
   /**
