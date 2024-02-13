@@ -1,4 +1,3 @@
-
 const { OpenAI } = require("openai");
 
 // These prompts happen before each message under the 'system' role
@@ -30,26 +29,25 @@ class OpenAiManager {
    * @returns
    */
   async prompt(userPrompt, user = "default") {
-
     // if we previously have a response, we return it instead
     if (this._cache[user]?.[userPrompt] !== undefined) {
       return this._cache[user][userPrompt];
     }
 
-    const timeNow       = Date.now();
-    const waitTimeLimit = 3000;      //  variable name so it does look like a "magic number" known in programming
+    const timeNow = Date.now();
+    const waitTimeLimit = 3000; //  variable name so it does look like a "magic number" known in programming
 
-   
     //we don't submit a prompt unless it's been more than 3 seconds.
-    if (this._lastMessageTime && (timeNow - this._lastMessageTime < waitTimeLimit)) {
+    if (this._lastMessageTime && timeNow - this._lastMessageTime < waitTimeLimit) {
       return "";
     }
 
-    const messages  = this._constructMessage(userPrompt, user);
-    const result    = await this._generateReply(messages);
+    const messages = this._constructMessage(userPrompt, user);
+    const result = await this._generateReply(messages);
     this._updateCache(user, userPrompt, result);
     this._updateLastMessageTime(timeNow);
 
+    return result;
   }
 
   /**
@@ -59,7 +57,6 @@ class OpenAiManager {
    * @returns {Array<{ role: string, content: string }>} An array of messages for OpenAI.
    */
   _constructMessage(userPrompt, user) {
-
     const previousChats = this._getUserChats(user);
 
     const messages = [
@@ -81,30 +78,27 @@ class OpenAiManager {
       content: `${user} writes: ${userPrompt}.`,
     });
 
-    return messages
+    return messages;
   }
 
   /**
    * Generates a reply from OpenAI based on the provided messages.
    * @param {Array<{ role: string, content: string }>} messages - The messages to send to OpenAI.
    * @returns {Promise<string>} A promise that resolves to the generated response from OpenAI.
-   */  
+   */
   async _generateReply(messages) {
     try {
-        const completion = await this._openAi.chat.completions.create({
-            messages,
-            model: "gpt-3.5-turbo",
-        });
+      const completion = await this._openAi.chat.completions.create({
+        messages,
+        model: "gpt-3.5-turbo",
+      });
 
-        return completion.choices[0].message.content || '';
+      return completion.choices[0].message.content || "";
     } catch (error) {
-        console.error("Error while generating reply:", error);
-        return '';
-      
+      console.error("Error while generating reply:", error);
+      return "";
     }
-}
-
-
+  }
 
   /**
    * Updates the cache with the result of a prompt.
@@ -117,16 +111,14 @@ class OpenAiManager {
       this._cache[user] = {};
     }
     this._cache[user][userPrompt] = result;
-
   }
 
   /**
    * Updates the last message time to the current timestamp.
-  */
+   */
   _updateLastMessageTime(currentTime) {
     this._lastMessageTime = currentTime;
   }
-
 
   /**
    * Gets all the user chat history
@@ -149,4 +141,3 @@ class OpenAiManager {
 }
 
 module.exports = OpenAiManager;
-

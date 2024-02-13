@@ -77,37 +77,34 @@ class BotManager {
   /**
    * Runs whenever a message is written in the chat
    * Doesn't reply to messages all the time, only if it hasn't replied in the last 3 seconds.
+   * Check if the user is not a bot and if not
+   * parses a 'user mention' and message from the given content from.
+   * Listens for a command in the format "@<username> <message>" on Discord,
+   * where the first part specifies the user you want to send the message to,
+   * and the second part is the message content.
+   * For example, if a user enters "@peter123 this is a test",
+   * the function parses the username and message,
+   * then sends the message to the mentioned user if found.
+   * If the command is not entered, or if the content is not in the expected format,
+   * the function takes no action and continues with the rest of the code.
    * @param { Message } message
    * @private
    */
   _onMessageCreate(message) {
+    const author = message.author.id;
+    const content = message.content;
+    const hasBeenMentioned = message.mentions.has(this._client.user.id);
+    const isSameAuthor = author === this._client.application.id;
+    const currentTimeNow = Date.now();
+    const waitTimeLimit = 3000; // assigned name to avoid the dreaded "magic number" know in programming
+    const hasTalkedRecently =
+      this._lastMessageTime && currentTimeNow - this._lastMessageTime < waitTimeLimit;
 
-    const author             = message.author.id;
-    const content            = message.content;
-    const hasBeenMentioned   = message.mentions.has(this._client.user.id);
-    const isSameAuthor       = author === this._client.application.id;
-    const currentTimeNow     = Date.now();
-    const waitTimeLimit      = 3000       // assigned name to avoid the dreaded "magic number" know in programming
-    const hasTalkedRecently  = this._lastMessageTime && currentTimeNow - this._lastMessageTime < waitTimeLimit;
-
-
-    // Check if the user is not a bot and if not 
-    // parses a 'user mention' and message from the given content from.
-    // Listens for a command in the format "@<username> <message>" on Discord,
-    // where the first part specifies the user you want to send the message to,
-    // and the second part is the message content.
-    // For example, if a user enters "@peter123 this is a test",
-    // the function parses the username and message,
-    // then sends the message to the mentioned user if found.
-    // If the command is not entered, or if the content is not in the expected format,
-    // the function takes no action and continues with the rest of the code.
     if (author !== this._client.application.id) {
-
       const { userId, messageContent } = parseUserMentionAndMessage(content);
       if (userId && messageContent) {
         this._sendDirectMessageToUser(userId, messageContent);
       }
-
     }
 
     //  We don't send a message if:
@@ -119,50 +116,45 @@ class BotManager {
     }
 
     this._queryOpenAi(content, message, currentTimeNow);
-
   }
 
   /**
- * Sends a direct message to a user identified by their user ID.
- * @param {string} userID - The ID of the user to whom the message will be sent.
- * @param {string} message - The content of the message to be sent.
- */
+   * Sends a direct message to a user identified by their user ID.
+   * @param {string} userID - The ID of the user to whom the message will be sent.
+   * @param {string} message - The content of the message to be sent.
+   */
   _sendDirectMessageToUser(userID, message) {
-   
     const user = this._client.users.cache?.get(userID);
-  
+
     if (!user) {
       console.log(`User with ID ${userID} does not exist.`);
       return;
-   }
-    
-    user.send(message)
-        .then(() => {
-          console.log("The message was sent successfully.");
-        })
-        .catch(() => {
-          console.log("Failed to send the message.");
-        });
     }
-  
+
+    user
+      .send(message)
+      .then(() => {
+        console.log("The message was sent successfully.");
+      })
+      .catch(() => {
+        console.log("Failed to send the message.");
+      });
+  }
 
   /**
    * Queries the OpenAI API with the provided prompt and sends the response to the message channel.
-   * 
+   *
    * @param {string} prompt - The prompt to query the OpenAI API.
    * @param {Message} message - The Discord message object representing the message triggering the query.
    * @param {number} currentTimeStamp - The current timestamp used for tracking the time of the last message.
- */
+   */
   _queryOpenAi(prompt, message, currentTimeStamp) {
-
-
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
       if (reply && reply.length) {
         this._sendToChannel(message.channel, `<@${message.author.id}> ${reply}`);
         this._lastMessageTime = currentTimeStamp;
       }
     });
-    
   }
 
   /**
