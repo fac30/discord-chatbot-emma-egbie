@@ -57,7 +57,7 @@ class OpenAiManager {
    * @returns {Array<{ role: string, content: string }>} An array of messages for OpenAI.
    */
   _constructMessage(userPrompt, user) {
-    const previousChats = this._getUserChats(user);
+    const previousChats = this.getUserChats(user);
 
     const messages = [
       { role: "system", content: `Your name is ${this.name} and ${this.name} only. ` },
@@ -125,7 +125,7 @@ class OpenAiManager {
    * @param { string } user - username
    * @returns all the user chat history with the bot as a single string.
    */
-  _getUserChats(user = "default") {
+  getUserChats(user = "default") {
     return this._cache[user]
       ? Object.entries(this._cache[user])
           .map(([prompt, response]) => {
