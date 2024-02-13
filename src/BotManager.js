@@ -5,10 +5,16 @@ const {
   TextChannel,
   Message,
   GuildMember,
+  EmbedBuilder,
+
 } = require("discord.js");
 
 const OpenAiManager = require("./OpenAiManager");
-const parseUserMentionAndMessage = require("./utils.js");
+const { changeStringToTitle,
+  extractQuestionAnswerPairs,
+  parseUserMentionAndMessage } = require("./utils.js");
+
+const currentTimeNow = Date.now();
 
 /**
  * Represents a manager for a Discord bot, responsible for initializing the bot,
@@ -91,6 +97,7 @@ class BotManager {
    * @private
    */
   _onMessageCreate(message) {
+
     const author = message.author.id;
     const content = message.content;
     const hasBeenMentioned = message.mentions.has(this._client.user.id);
@@ -104,6 +111,8 @@ class BotManager {
       const { userId, messageContent } = parseUserMentionAndMessage(content);
       if (userId && messageContent) {
         this._sendDirectMessageToUser(userId, messageContent);
+      }  else if (content === "!showMyChatHistory") {   // checks for the phrase "!showMyChatHistory" in order to display the user's history
+        this._showUserChatHistory(message);           
       }
     }
 
@@ -116,6 +125,7 @@ class BotManager {
     }
 
     this._queryOpenAi(content, message, currentTimeNow);
+
   }
 
   /**
@@ -148,15 +158,98 @@ class BotManager {
    * @param {Message} message - The Discord message object representing the message triggering the query.
    * @param {number} currentTimeStamp - The current timestamp used for tracking the time of the last message.
    */
-  _queryOpenAi(prompt, message, currentTimeStamp) {
+  async _queryOpenAi(prompt, message) {
+
+    const waitMsg = await this._sendToChannel(this.defaultChannel, "Fetching response, please wait....");
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
-      if (reply && reply.length) {
-        this._sendToChannel(message.channel, `<@${message.author.id}> ${reply}`);
-        this._lastMessageTime = currentTimeStamp;
+
+      if (!reply || (reply && !reply.length)) {
+        this._sendToChannel(message.channel, `<@${message.author.id}> Failed to fetch your response!!!}`);
       }
+
+      this._sendToChannel(message.channel, `\n <@${message.author.id}> ${reply}`);
+
+      waitMsg.delete() // delete the message once the we get data or regardless whether we get the data
+
     });
   }
 
+/**
+ * Displays the chat history of the user who triggered the command in an embedded format.
+ * If there's no chat history available, sends a message indicating so.
+ * Users can request their entire chat history by issuing the command "!showMyChatHistory" in Discord.
+ * 
+ * @param {Message} message The message object representing the command invocation.
+ * @returns {Promise<void>} A promise that resolves once the chat history is displayed.
+ */
+  async _showUserChatHistory(message) {
+   
+    const chatHistory = this._openAi.getUserChats(message.author.username);
+
+    // Check if there's no chat history available
+    if (!chatHistory) {
+      return await this._sendToChannel(this.defaultChannel, "There are no chats to view!!")
+        ;
+    }
+
+    const loadingMessage = await this._sendToChannel(this.defaultChannel, `Fetching chat history from ${message.author.username}'s account...`);
+
+    const popupEmbed = await this._createEmbeddedChatHistory(chatHistory, message);
+    await loadingMessage.edit({ content: 'Here is your chat history:', embeds: [popupEmbed] });
+  }
+
+  /**
+  * Creates an embedded representation of the provided chat history.
+  * @param {string} chatHistory The chat history to be embedded.
+  * @param {Message} message The message object used for context, such as the author's username.
+  * @returns {Promise<MessageEmbed>} A promise that resolves with the embedded chat history.
+  */
+  async _createEmbeddedChatHistory(chatHistory, message) {
+
+    // Extract question-answer pairs from the chat history
+    const qaPairs = extractQuestionAnswerPairs(chatHistory);
+    const fields = await this._generateFieldsFromQAPairs(qaPairs);
+
+    // Create the embedded message
+    const popupEmbed = new EmbedBuilder()
+      .setTitle('User Chat History')
+      .setAuthor({ name: `Bot name: ${this._openAi.name}` })
+      .setColor('DarkRed')
+      .setTimestamp(currentTimeNow)
+      .setFooter({ text: message.author.username })
+      .addFields(fields);
+
+    return popupEmbed;
+  }
+
+  /**
+    * Generates fields from question-answer pairs.
+    * @param {string[]} qaPairs - An array of question-answer pairs.
+    * @returns {Object[]} An array of field objects.
+    * @private
+    */
+  async _generateFieldsFromQAPairs(qaPairs) {
+    const fields = [];
+    const [startIndex, endIndex] = [0, -1];
+
+
+    // Iterate over each question-answer pair and add them as fields to the array
+    qaPairs.forEach((qaPair) => {
+      let [question, answer] = qaPair.split(' A: ');
+
+      question = parseUserMentionAndMessage(question).messageContent.slice(startIndex, endIndex);
+
+      // Create an object representing a field and push it to the fields array
+      fields.push({
+        name: `Q:  ${changeStringToTitle(question)}`,
+        value: `A:  ${answer}`,
+        inline: false
+      });
+
+      fields.push({ name: '\u200b', value: '\u200b' }) // Empty field for line break
+    });
+    return fields;
+  }
   /**
    * Sends a welcome message to the system channel announcing the new member.
    * @param { GuildMember } member
@@ -183,10 +276,18 @@ class BotManager {
    * @param {string} message - The message content to send.
    * @private
    */
-  _sendToChannel(channel, message) {
-    if (!channel) return console.error("Channel not found!!");
+  async _sendToChannel(channel, message) {
+    try {
+      if (!channel) {
+        throw new Error("Channel not found!!");
+      }
 
-    channel.send(message);
+      return await channel.send(message);
+    } catch (error) {
+      console.error("Error sending message:", error.message);
+
+      return '';
+    }
   }
 
   get defaultChannel() {
