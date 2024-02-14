@@ -2,19 +2,15 @@ const {
   Client,
   GatewayIntentBits,
   Events,
+  EmbedBuilder,
   TextChannel,
   Message,
   GuildMember,
-  EmbedBuilder,
   User,
 } = require("discord.js");
 
 const OpenAiManager = require("./OpenAiManager");
 const { changeStringToTitle, parseUserMentionAndMessage } = require("./utils.js");
-
-const showHistoryCommand = "!showMyChatHistory";
-const strikeInterval = 3;
-const currentTimeNow = Date.now();
 
 /**
  * Represents a manager for a Discord bot, responsible for initializing the bot,
@@ -27,6 +23,11 @@ class BotManager {
    * @param {string} server_ID - The ID of the server where the bot will operate.
    */
   constructor(discordBotToken, server_ID, openai_KEY) {
+    /** @private */
+    this.showHistoryCommand = "!showMyChatHistory";
+    /** @private */
+    this.strikeInterval = 3;
+
     /** @private */
     this._client = new Client({
       intents: [
@@ -46,7 +47,6 @@ class BotManager {
     this._initialized = false;
     /** @private */
     this._lastMessageTime;
-
     /**@private */
     this._userStrikes = {};
 
@@ -80,7 +80,7 @@ class BotManager {
    */
   _announcePresence() {
     const botName = this._client.user.displayName;
-    const msg = `Hello everyone! I'm the ${botName}, now online and ready to chat. To chat with me, type @${botName} followed by your prompt. To see your history, type @${botName} ${showHistoryCommand}.`;
+    const msg = `Hello everyone! I'm the ${botName}, now online and ready to chat. To chat with me, type @${botName} followed by your prompt. To see your history, type @${botName} ${this.showHistoryCommand}.`;
     this._sendToChannel(this.defaultChannel, msg);
   }
 
@@ -105,10 +105,11 @@ class BotManager {
     const content = message.content;
     const hasBeenMentioned = message.mentions.has(this._client.user.id);
     const isSameAuthor = author === this._client.application.id;
+    const currentTime = Date.now();
     const waitTimeLimit = 3000;
 
     const hasTalkedRecently =
-      this._lastMessageTime && Date.now() - this._lastMessageTime < waitTimeLimit;
+      this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
 
     //  We don't send a message if:
     // - we sent the last message
@@ -118,9 +119,9 @@ class BotManager {
       return;
     }
     const { messageContent } = parseUserMentionAndMessage(content);
-    if (messageContent.trim() === showHistoryCommand) {
+    if (messageContent.trim() === this.showHistoryCommand) {
       // checks for the phrase "!showMyChatHistory" in order to display the user's history
-      this._showUserChatHistory(message);
+      this._showUserChatHistory(message, currentTime);
       return;
     }
 
@@ -157,14 +158,14 @@ class BotManager {
 
     // if the user exceed the strike interval, and for every time they exceed it
     if (
-      this._userStrikes[username] > strikeInterval &&
-      this._userStrikes[username] % strikeInterval === 1
+      this._userStrikes[username] > this.strikeInterval &&
+      this._userStrikes[username] % this.strikeInterval === 1
     ) {
       const member = await this.guild.members.fetch({ user });
       try {
         // increments the time the user is timed out for depending of how many strikes they have.
         // but it doesn't exceed one hour.
-        const timeoutDuration = Math.min(strikeInterval ** 2 * 1000, 3600 * 1000);
+        const timeoutDuration = Math.min(this.strikeInterval ** 2 * 1000, 3600 * 1000);
         await member.timeout(timeoutDuration, "Violating speech terms.");
       } catch (e) {
         console.error(
@@ -228,9 +229,10 @@ class BotManager {
    * Users can request their entire chat history by issuing the command "!showMyChatHistory" in Discord.
    *
    * @param {Message} message The message object representing the command invocation.
+   * @param {number} currentTime the current time
    * @returns {Promise<void>} A promise that resolves once the chat history is displayed.
    */
-  async _showUserChatHistory(message) {
+  async _showUserChatHistory(message, currentTime) {
     const chatHistory = this._openAi.getUserHistory(message.author.username);
 
     // Check if there's no chat history available
@@ -243,7 +245,7 @@ class BotManager {
       `Fetching chat history from ${message.author.username}'s account...`
     );
 
-    const popupEmbed = await this._createEmbeddedChatHistory(chatHistory, message);
+    const popupEmbed = await this._createEmbeddedChatHistory(chatHistory, message, currentTime);
     await loadingMessage.edit({ content: "Here is your chat history:", embeds: [popupEmbed] });
   }
 
@@ -251,9 +253,10 @@ class BotManager {
    * Creates an embedded representation of the provided chat history.
    * @param {string[][]} chatHistory The chat history to be embedded.
    * @param {Message} message The message object used for context, such as the author's username.
+   * @param {number} currentTime the current time
    * @returns {Promise<MessageEmbed>} A promise that resolves with the embedded chat history.
    */
-  async _createEmbeddedChatHistory(chatHistory, message) {
+  async _createEmbeddedChatHistory(chatHistory, message, currentTime) {
     // Extract question-answer pairs from the chat history
     const fields = this._generateFieldsFromQAPairs(chatHistory);
 
@@ -262,7 +265,7 @@ class BotManager {
       .setTitle("User Chat History")
       .setAuthor({ name: `Bot name: ${this._openAi.name}` })
       .setColor("DarkRed")
-      .setTimestamp(currentTimeNow)
+      .setTimestamp(currentTime)
       .setFooter({ text: message.author.username })
       .addFields(fields);
 
@@ -283,7 +286,7 @@ class BotManager {
       // Create an object representing a field and push it to the fields array
       fields.push({
         name: `Q:  ${changeStringToTitle(question)}`,
-        value: `A:  ${answer}`,
+        value: `**A: **  ${answer}`,
         inline: false,
       });
 
