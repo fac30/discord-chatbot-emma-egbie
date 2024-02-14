@@ -44,10 +44,27 @@ class OpenAiManager {
 
     const messages = this._constructMessage(userPrompt, user);
     const result = await this._generateReply(messages);
-    this._updateCache(user, userPrompt, result);
+    this.updateCache(user, userPrompt, result);
     this._updateLastMessageTime(timeNow);
 
     return result;
+  }
+
+  /**
+   * Runs the user prompt through the moderations api.
+   * @param {string} userPrompt
+   * @returns {Promise<string[]>}
+   */
+  async moderatePrompt(userPrompt) {
+    const moderationPayload = await this._openAi.moderations.create({
+      input: userPrompt,
+      model: "text-moderation-stable",
+    });
+
+    const violationCategories = moderationPayload.results[0].categories;
+    return Object.entries(violationCategories)
+      .filter(([, value]) => value)
+      .map(([key]) => key);
   }
 
   /**
@@ -57,7 +74,7 @@ class OpenAiManager {
    * @returns {Array<{ role: string, content: string }>} An array of messages for OpenAI.
    */
   _constructMessage(userPrompt, user) {
-    const previousChats = this.getUserChats(user);
+    const previousChats = this._getUserChats(user);
 
     const messages = [
       { role: "system", content: `Your name is ${this.name} and ${this.name} only. ` },
@@ -106,7 +123,7 @@ class OpenAiManager {
    * @param {string} userPrompt - The prompt provided by the user.
    * @param {string} result - The generated response from OpenAI.
    */
-  _updateCache(user, userPrompt, result) {
+  updateCache(user, userPrompt, result) {
     if (!this._cache[user]) {
       this._cache[user] = {};
     }
@@ -124,15 +141,21 @@ class OpenAiManager {
    * Gets all the user chat history
    * @param { string } user - username
    * @returns all the user chat history with the bot as a single string.
+   * @private
    */
-  getUserChats(user = "default") {
-    return this._cache[user]
-      ? Object.entries(this._cache[user])
-          .map(([prompt, response]) => {
-            return `Q: ${prompt}, A: ${response}`;
-          })
-          .join(" ")
-      : "";
+  _getUserChats(user) {
+    return this.getUserHistory(user)
+      .map(([prompt, response]) => `Q: ${prompt}, A: ${response}`)
+      .join(" ");
+  }
+
+  /**
+   * Gets all the user chat history
+   * @param { string } user - username
+   * @returns all the user chat history with the bot as a single string.
+   */
+  getUserHistory(user) {
+    return this._cache[user] ? Object.entries(this._cache[user]) : [];
   }
 
   setName(name) {

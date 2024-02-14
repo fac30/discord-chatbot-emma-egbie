@@ -6,14 +6,14 @@ const {
   Message,
   GuildMember,
   EmbedBuilder,
-
+  User,
 } = require("discord.js");
 
 const OpenAiManager = require("./OpenAiManager");
-const { changeStringToTitle,
-  extractQuestionAnswerPairs,
-  parseUserMentionAndMessage } = require("./utils.js");
+const { changeStringToTitle, parseUserMentionAndMessage } = require("./utils.js");
 
+const showHistoryCommand = "!showMyChatHistory";
+const strikeInterval = 3;
 const currentTimeNow = Date.now();
 
 /**
@@ -47,6 +47,9 @@ class BotManager {
     /** @private */
     this._lastMessageTime;
 
+    /**@private */
+    this._userStrikes = {};
+
     // hook up event listeners here
     this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
     this._client.on(Events.GuildMemberAdd, this._announceNewMember.bind(this));
@@ -76,7 +79,8 @@ class BotManager {
    * @private
    */
   _announcePresence() {
-    const msg = `Hello everyone! I'm the ${this._client.user.displayName}, now online and ready to chat.`;
+    const botName = this._client.user.displayName;
+    const msg = `Hello everyone! I'm the ${botName}, now online and ready to chat. To chat with me, type @${botName} followed by your prompt. To see your history, type @${botName} ${showHistoryCommand}.`;
     this._sendToChannel(this.defaultChannel, msg);
   }
 
@@ -96,25 +100,15 @@ class BotManager {
    * @param { Message } message
    * @private
    */
-  _onMessageCreate(message) {
-
+  async _onMessageCreate(message) {
     const author = message.author.id;
     const content = message.content;
     const hasBeenMentioned = message.mentions.has(this._client.user.id);
     const isSameAuthor = author === this._client.application.id;
-    const currentTimeNow = Date.now();
-    const waitTimeLimit = 3000; // assigned name to avoid the dreaded "magic number" know in programming
-    const hasTalkedRecently =
-      this._lastMessageTime && currentTimeNow - this._lastMessageTime < waitTimeLimit;
+    const waitTimeLimit = 3000;
 
-    if (author !== this._client.application.id) {
-      const { userId, messageContent } = parseUserMentionAndMessage(content);
-      if (userId && messageContent) {
-        this._sendDirectMessageToUser(userId, messageContent);
-      }  else if (content === "!showMyChatHistory") {   // checks for the phrase "!showMyChatHistory" in order to display the user's history
-        this._showUserChatHistory(message);           
-      }
-    }
+    const hasTalkedRecently =
+      this._lastMessageTime && Date.now() - this._lastMessageTime < waitTimeLimit;
 
     //  We don't send a message if:
     // - we sent the last message
@@ -123,9 +117,61 @@ class BotManager {
     if (isSameAuthor || hasTalkedRecently || !hasBeenMentioned) {
       return;
     }
+    const { messageContent } = parseUserMentionAndMessage(content);
+    if (messageContent.trim() === showHistoryCommand) {
+      // checks for the phrase "!showMyChatHistory" in order to display the user's history
+      this._showUserChatHistory(message);
+      return;
+    }
 
-    this._queryOpenAi(content, message, currentTimeNow);
+    const moderations = await this._openAi.moderatePrompt(content);
 
+    if (moderations.length) {
+      this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
+    } else {
+      this._queryOpenAi(messageContent, message);
+    }
+  }
+
+  /**
+   * Sends
+   * @param {string} moderations
+   * @param {User} user
+   * @param {string} messageContent
+   */
+  _sendWarningModerationMessage(moderations, user, messageContent) {
+    this._strikeUser(user);
+    const moderationMessage = `Your message has been flagged for: ${moderations}. Sending messages which violate OpenAI's terms of use will result in a ban`;
+
+    this._sendToChannel(this.defaultChannel, moderationMessage);
+    this._openAi.updateCache(user.username, messageContent, moderationMessage);
+  }
+
+  /**
+   * @param {User} user
+   */
+  async _strikeUser(user) {
+    const username = user.username;
+    this._userStrikes[username] = this._userStrikes[username] ?? 0;
+    this._userStrikes[username]++;
+
+    // if the user exceed the strike interval, and for every time they exceed it
+    if (
+      this._userStrikes[username] > strikeInterval &&
+      this._userStrikes[username] % strikeInterval === 1
+    ) {
+      const member = await this.guild.members.fetch({ user });
+      try {
+        // increments the time the user is timed out for depending of how many strikes they have.
+        // but it doesn't exceed one hour.
+        const timeoutDuration = Math.min(strikeInterval ** 2 * 1000, 3600 * 1000);
+        await member.timeout(timeoutDuration, "Violating speech terms.");
+      } catch (e) {
+        console.error(
+          "Cannot timeout member. Could be because member has a higher role than the bot."
+        );
+      }
+    }
   }
 
   /**
@@ -156,65 +202,66 @@ class BotManager {
    *
    * @param {string} prompt - The prompt to query the OpenAI API.
    * @param {Message} message - The Discord message object representing the message triggering the query.
-   * @param {number} currentTimeStamp - The current timestamp used for tracking the time of the last message.
    */
   async _queryOpenAi(prompt, message) {
-
-    const waitMsg = await this._sendToChannel(this.defaultChannel, "Fetching response, please wait....");
+    const waitMsg = await this._sendToChannel(
+      this.defaultChannel,
+      "Fetching response, please wait...."
+    );
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
-
       if (!reply || (reply && !reply.length)) {
-        this._sendToChannel(message.channel, `<@${message.author.id}> Failed to fetch your response!!!}`);
+        this._sendToChannel(
+          message.channel,
+          `<@${message.author.id}> Failed to fetch your response!!!}`
+        );
       }
 
       this._sendToChannel(message.channel, `\n <@${message.author.id}> ${reply}`);
 
-      waitMsg.delete() // delete the message once the we get data or regardless whether we get the data
-
+      waitMsg.delete(); // delete the message once the we get data or regardless whether we get the data
     });
   }
 
-/**
- * Displays the chat history of the user who triggered the command in an embedded format.
- * If there's no chat history available, sends a message indicating so.
- * Users can request their entire chat history by issuing the command "!showMyChatHistory" in Discord.
- * 
- * @param {Message} message The message object representing the command invocation.
- * @returns {Promise<void>} A promise that resolves once the chat history is displayed.
- */
+  /**
+   * Displays the chat history of the user who triggered the command in an embedded format.
+   * If there's no chat history available, sends a message indicating so.
+   * Users can request their entire chat history by issuing the command "!showMyChatHistory" in Discord.
+   *
+   * @param {Message} message The message object representing the command invocation.
+   * @returns {Promise<void>} A promise that resolves once the chat history is displayed.
+   */
   async _showUserChatHistory(message) {
-   
-    const chatHistory = this._openAi.getUserChats(message.author.username);
+    const chatHistory = this._openAi.getUserHistory(message.author.username);
 
     // Check if there's no chat history available
-    if (!chatHistory) {
-      return await this._sendToChannel(this.defaultChannel, "There are no chats to view!!")
-        ;
+    if (!chatHistory.length) {
+      return await this._sendToChannel(this.defaultChannel, "There are no chats to view!");
     }
 
-    const loadingMessage = await this._sendToChannel(this.defaultChannel, `Fetching chat history from ${message.author.username}'s account...`);
+    const loadingMessage = await this._sendToChannel(
+      this.defaultChannel,
+      `Fetching chat history from ${message.author.username}'s account...`
+    );
 
     const popupEmbed = await this._createEmbeddedChatHistory(chatHistory, message);
-    await loadingMessage.edit({ content: 'Here is your chat history:', embeds: [popupEmbed] });
+    await loadingMessage.edit({ content: "Here is your chat history:", embeds: [popupEmbed] });
   }
 
   /**
-  * Creates an embedded representation of the provided chat history.
-  * @param {string} chatHistory The chat history to be embedded.
-  * @param {Message} message The message object used for context, such as the author's username.
-  * @returns {Promise<MessageEmbed>} A promise that resolves with the embedded chat history.
-  */
+   * Creates an embedded representation of the provided chat history.
+   * @param {string[][]} chatHistory The chat history to be embedded.
+   * @param {Message} message The message object used for context, such as the author's username.
+   * @returns {Promise<MessageEmbed>} A promise that resolves with the embedded chat history.
+   */
   async _createEmbeddedChatHistory(chatHistory, message) {
-
     // Extract question-answer pairs from the chat history
-    const qaPairs = extractQuestionAnswerPairs(chatHistory);
-    const fields = await this._generateFieldsFromQAPairs(qaPairs);
+    const fields = this._generateFieldsFromQAPairs(chatHistory);
 
     // Create the embedded message
     const popupEmbed = new EmbedBuilder()
-      .setTitle('User Chat History')
+      .setTitle("User Chat History")
       .setAuthor({ name: `Bot name: ${this._openAi.name}` })
-      .setColor('DarkRed')
+      .setColor("DarkRed")
       .setTimestamp(currentTimeNow)
       .setFooter({ text: message.author.username })
       .addFields(fields);
@@ -223,30 +270,24 @@ class BotManager {
   }
 
   /**
-    * Generates fields from question-answer pairs.
-    * @param {string[]} qaPairs - An array of question-answer pairs.
-    * @returns {Object[]} An array of field objects.
-    * @private
-    */
-  async _generateFieldsFromQAPairs(qaPairs) {
+   * Generates fields from question-answer pairs.
+   * @param {[string, string][]} qaPairs - An array of question-answer pairs.
+   * @returns {Object[]} An array of field objects.
+   * @private
+   */
+  _generateFieldsFromQAPairs(qaPairs) {
     const fields = [];
-    const [startIndex, endIndex] = [0, -1];
-
 
     // Iterate over each question-answer pair and add them as fields to the array
-    qaPairs.forEach((qaPair) => {
-      let [question, answer] = qaPair.split(' A: ');
-
-      question = parseUserMentionAndMessage(question).messageContent.slice(startIndex, endIndex);
-
+    qaPairs.forEach(([question, answer]) => {
       // Create an object representing a field and push it to the fields array
       fields.push({
         name: `Q:  ${changeStringToTitle(question)}`,
         value: `A:  ${answer}`,
-        inline: false
+        inline: false,
       });
 
-      fields.push({ name: '\u200b', value: '\u200b' }) // Empty field for line break
+      fields.push({ name: "\u200b", value: "\u200b" }); // Empty field for line break
     });
     return fields;
   }
@@ -286,13 +327,16 @@ class BotManager {
     } catch (error) {
       console.error("Error sending message:", error.message);
 
-      return '';
+      return "";
     }
   }
 
   get defaultChannel() {
-    const guild = this._client.guilds.cache.get(this._serverID);
-    return guild && guild.id === this._serverID ? guild?.systemChannel : null;
+    return this.guild && this.guild.id === this._serverID ? this.guild?.systemChannel : null;
+  }
+
+  get guild() {
+    return this._client.guilds.cache.get(this._serverID);
   }
 }
 
