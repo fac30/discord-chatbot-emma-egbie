@@ -5,9 +5,10 @@
  * @returns {object} An object containing the user ID and message content.
  */
 function parseUserMentionAndMessage(messageObj) {
+
   const regex = /<@&?(\d+)> ?(.*)/;
   const match = messageObj.match(regex);
-
+ 
   // Extract userId and messageContent from the match, if any
   const userId = match ? match[1] : null;
   const messageContentAfterMention = match ? match[2].trim() : null;
@@ -15,14 +16,6 @@ function parseUserMentionAndMessage(messageObj) {
   return { userId, messageContent: messageContentAfterMention };
 }
 
-/**
- * Extracts all question-answer pairs from a chat history string.
- * @param {string} chatHistory - The chat history string containing question-answer pairs.
- * @returns {string[]} An array of question-answer pairs extracted from the chat history.
- */
-function extractQuestionAnswerPairs(chatHistory) {
-  return chatHistory.split(/(?=Q:)/).filter((pair) => pair.trim() !== "");
-}
 
 function changeStringToTitle(string) {
   return string[0].toUpperCase() + string.slice(1);
@@ -31,6 +24,5 @@ function changeStringToTitle(string) {
 // Exporting multiple variables or functions
 module.exports = {
   changeStringToTitle,
-  extractQuestionAnswerPairs,
   parseUserMentionAndMessage,
 };
