@@ -80,8 +80,13 @@ class BotManager {
    */
   _announcePresence() {
     const botName = this._client.user.displayName;
-    const msg = `Hello everyone! I'm the ${botName}, now online and ready to chat. To chat with me, type @${botName} followed by your prompt. To see your history, type @${botName} ${this.showHistoryCommand}.`;
-    this._sendToChannel(this.defaultChannel, msg);
+   
+    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` + 
+            `**type @${botName} followed by your prompt**. ` +
+            `To see your history, **type @${botName} ${this.showHistoryCommand}** ` + 
+            `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
+
+    this._sendToChannel(this.defaultChannel, msg);;
   }
 
   /**
@@ -108,31 +113,66 @@ class BotManager {
     const currentTime = Date.now();
     const waitTimeLimit = 3000;
 
-    const hasTalkedRecently =
-      this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
+    const hasTalkedRecently = this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
 
+    const { userId, messageContent } = parseUserMentionAndMessage(content);
+    const isDirectMessage = userId && messageContent;
+
+    if (author !== this._client.application.id) {
+     
+      this._monitorUserContent(content, message, isDirectMessage)
+      
+      switch(messageContent) {
+
+        case isDirectMessage:
+          this._sendDirectMessageToUser(userId, messageContent);
+          break;
+        
+        case (messageContent.trim() === this.showHistoryCommand):
+          this._showUserChatHistory(message, currentTime);
+          break;
+        
+      }
+                    
+    }
+  
     //  We don't send a message if:
     // - we sent the last message
     // - we haven't been mentioned in the last message
     // - we already replied in the last 3 seconds
+    //
+    // The line has to be at the bottom because if it is at the top, it prevents the other actions from executing.
+    // This is because it checks if the user has already been interacted with (talked to, mentioned, or talked to recently),
+    // and if so, the preceding if statement is not triggered. This means that the actions involving OpenAI, sending messages,
+    // and showing history are delayed until after a 3 seconds since there are not called because of the return statement.
     if (isSameAuthor || hasTalkedRecently || !hasBeenMentioned) {
       return;
     }
-    const { messageContent } = parseUserMentionAndMessage(content);
-    if (messageContent.trim() === this.showHistoryCommand) {
-      // checks for the phrase "!showMyChatHistory" in order to display the user's history
-      this._showUserChatHistory(message, currentTime);
-      return;
-    }
 
-    const moderations = await this._openAi.moderatePrompt(content);
-
-    if (moderations.length) {
-      this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
-    } else {
-      this._queryOpenAi(messageContent, message);
-    }
   }
+
+  /**
+ * Monitors user content for moderation and takes action accordingly.
+ * 
+ * @param {string} content - The content to monitor.
+ * @param {Message} message - The message object representing the context of the command.
+ * @param {boolean} [isDirectMessage=false] - Flag indicating whether the content should be sent as a direct message to a user.
+ * @returns {Promise<void>} - A Promise that resolves when the monitoring process is complete.
+ */
+async _monitorUserContent(content, message, isDirectMessage=false) {
+  const moderations = await this._openAi.moderatePrompt(content);
+  const messageContent = parseUserMentionAndMessage(content).messageContent;
+
+  if (moderations.length) {
+      this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
+      return;
+  } 
+
+  // Query OpenAI only if the message is not intended to be sent as a DM (direct message).
+  if (!isDirectMessage) this._queryOpenAi(messageContent, message);
+
+}
+
 
   /**
    * Sends
@@ -205,10 +245,15 @@ class BotManager {
    * @param {Message} message - The Discord message object representing the message triggering the query.
    */
   async _queryOpenAi(prompt, message) {
+    
+    this._showBotTyping(message);
     const waitMsg = await this._sendToChannel(
       this.defaultChannel,
       "Fetching response, please wait...."
     );
+
+    
+
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
       if (!reply || (reply && !reply.length)) {
         this._sendToChannel(
@@ -217,6 +262,7 @@ class BotManager {
         );
       }
 
+     
       this._sendToChannel(message.channel, `\n <@${message.author.id}> ${reply}`);
 
       waitMsg.delete(); // delete the message once the we get data or regardless whether we get the data
@@ -233,13 +279,17 @@ class BotManager {
    * @returns {Promise<void>} A promise that resolves once the chat history is displayed.
    */
   async _showUserChatHistory(message, currentTime) {
+
     const chatHistory = this._openAi.getUserHistory(message.author.username);
 
+    this._showBotTyping(message);
+    
     // Check if there's no chat history available
     if (!chatHistory.length) {
       return await this._sendToChannel(this.defaultChannel, "There are no chats to view!");
     }
 
+  
     const loadingMessage = await this._sendToChannel(
       this.defaultChannel,
       `Fetching chat history from ${message.author.username}'s account...`
@@ -332,6 +382,16 @@ class BotManager {
 
       return "";
     }
+  }
+
+  /**
+   * Asynchronously displays typing status for the bot in the given message's channel.
+   * 
+   * @param {Message} message - The message object representing the context of the command.
+   * @returns {Promise<void>} - A Promise that resolves when the typing status is displayed.
+  */
+  async  _showBotTyping(message) {
+    await message.channel.sendTyping();
   }
 
   get defaultChannel() {
