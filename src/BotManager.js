@@ -120,7 +120,7 @@ class BotManager {
 
     if (author !== this._client.application.id) {
      
-      this._monitorUserContent(content, message, isDirectMessage)
+      this._moderateUserPrompt(content, message, isDirectMessage)
       
       switch(messageContent) {
 
@@ -159,7 +159,7 @@ class BotManager {
  * @param {boolean} [isDirectMessage=false] - Flag indicating whether the content should be sent as a direct message to a user.
  * @returns {Promise<void>} - A Promise that resolves when the monitoring process is complete.
  */
-async _monitorUserContent(content, message, isDirectMessage=false) {
+async _moderateUserPrompt(content, message, isDirectMessage=false) {
   const moderations = await this._openAi.moderatePrompt(content);
   const messageContent = parseUserMentionAndMessage(content).messageContent;
 
@@ -253,7 +253,6 @@ async _monitorUserContent(content, message, isDirectMessage=false) {
     );
 
     
-
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
       if (!reply || (reply && !reply.length)) {
         this._sendToChannel(
