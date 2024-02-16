@@ -26,6 +26,8 @@ class BotManager {
     /** @private */
     this.showHistoryCommand = "!showMyChatHistory";
     /** @private */
+    this._excludeArray = [this.showHistoryCommand];
+    /** @private */
     this.strikeInterval = 3;
 
     /** @private */
@@ -80,11 +82,11 @@ class BotManager {
    */
   _announcePresence() {
     const botName = this._client.user.displayName;
-   
-    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` + 
-            `**type @${botName} followed by your prompt**. ` +
-            `To see your history, **type @${botName} ${this.showHistoryCommand}** ` + 
-            `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
+
+    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` +
+      `**type @${botName} followed by your prompt**. ` +
+      `To see your history, **type @${botName} ${this.showHistoryCommand}** ` +
+      `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
 
     this._sendToChannel(this.defaultChannel, msg);;
   }
@@ -116,26 +118,27 @@ class BotManager {
     const hasTalkedRecently = this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
 
     const { userId, messageContent } = parseUserMentionAndMessage(content);
-    const isDirectMessage = userId && messageContent;
+    let isDirectMessage = (userId != this._client.application.id && messageContent && !this._isTextInExcludeList(messageContent));
 
     if (author !== this._client.application.id) {
-     
-      this._moderateUserPrompt(content, message, isDirectMessage)
-      
-      switch(messageContent) {
+
+      this._moderateUserPrompt(content, message, isDirectMessage);
+
+      switch (true) {
 
         case isDirectMessage:
           this._sendDirectMessageToUser(userId, messageContent);
           break;
-        
-        case (messageContent.trim() === this.showHistoryCommand):
-          this._showUserChatHistory(message, currentTime);
+
+        case (messageContent && messageContent.trim() === this.showHistoryCommand):
+          await this._showUserChatHistory(message, currentTime);
           break;
-        
+
       }
-                    
+
+
     }
-  
+
     //  We don't send a message if:
     // - we sent the last message
     // - we haven't been mentioned in the last message
@@ -159,19 +162,21 @@ class BotManager {
  * @param {boolean} [isDirectMessage=false] - Flag indicating whether the content should be sent as a direct message to a user.
  * @returns {Promise<void>} - A Promise that resolves when the monitoring process is complete.
  */
-async _moderateUserPrompt(content, message, isDirectMessage=false) {
-  const moderations = await this._openAi.moderatePrompt(content);
-  const messageContent = parseUserMentionAndMessage(content).messageContent;
+  async _moderateUserPrompt(content, message, isDirectMessage = false) {
+    const moderations = await this._openAi.moderatePrompt(content);
+    const messageContent = parseUserMentionAndMessage(content).messageContent;
 
-  if (moderations.length) {
+    if (moderations.length) {
+
       this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
+      this._deleteMsg(message);
       return;
-  } 
+    }
 
-  // Query OpenAI only if the message is not intended to be sent as a DM (direct message).
-  if (!isDirectMessage) this._queryOpenAi(messageContent, message);
-
-}
+    if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
+      await this._queryOpenAi(messageContent, message)
+    };
+  }
 
 
   /**
@@ -245,14 +250,14 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
    * @param {Message} message - The Discord message object representing the message triggering the query.
    */
   async _queryOpenAi(prompt, message) {
-    
+
     this._showBotTyping(message);
     const waitMsg = await this._sendToChannel(
       this.defaultChannel,
       "Fetching response, please wait...."
     );
 
-    
+
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
       if (!reply || (reply && !reply.length)) {
         this._sendToChannel(
@@ -261,7 +266,7 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
         );
       }
 
-     
+
       this._sendToChannel(message.channel, `\n <@${message.author.id}> ${reply}`);
 
       waitMsg.delete(); // delete the message once the we get data or regardless whether we get the data
@@ -282,13 +287,13 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
     const chatHistory = this._openAi.getUserHistory(message.author.username);
 
     this._showBotTyping(message);
-    
+
     // Check if there's no chat history available
     if (!chatHistory.length) {
       return await this._sendToChannel(this.defaultChannel, "There are no chats to view!");
     }
 
-  
+
     const loadingMessage = await this._sendToChannel(
       this.defaultChannel,
       `Fetching chat history from ${message.author.username}'s account...`
@@ -389,9 +394,37 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
    * @param {Message} message - The message object representing the context of the command.
    * @returns {Promise<void>} - A Promise that resolves when the typing status is displayed.
   */
-  async  _showBotTyping(message) {
+  async _showBotTyping(message) {
     await message.channel.sendTyping();
   }
+
+  /**
+ * Checks if a given text is included in the exclusion list.
+ * 
+ * @param {string} text - The text to check against the exclusion list.
+ * @returns {boolean} - Returns true if the text is found in the exclusion list, false otherwise.
+ */
+  _isTextInExcludeList(text) {
+    return this._excludeArray.includes(text);
+  }
+
+ /**
+ * Deletes a message and sends a reason to the default channel.
+ * @param {Message} message - The message object to delete.
+ * @param {string} [default string - reason="Your message has been deleted because it violates OpenAi rules"] .
+ */
+  _deleteMsg(message, reason = "Your message has been deleted because it violates OpenAi rules") {
+    if (message) {
+      message.delete()
+        .then(() => {
+          this._sendToChannel(this.defaultChannel, reason);
+        })
+        .catch((error) => {
+          console.error('Error deleting message:', error);
+        });
+    }
+  }
+
 
   get defaultChannel() {
     return this.guild && this.guild.id === this._serverID ? this.guild?.systemChannel : null;
