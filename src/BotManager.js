@@ -169,6 +169,7 @@ class BotManager {
     if (moderations.length && !this._isTextInExcludeList(messageContent)) {
 
       this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
+      this._deleteMsg(message);
       return;
     }
 
@@ -406,6 +407,24 @@ class BotManager {
   _isTextInExcludeList(text) {
     return this._excludeArray.includes(text);
   }
+
+ /**
+ * Deletes a message and sends a reason to the default channel.
+ * @param {Message} message - The message object to delete.
+ * @param {string} [default string - reason="Your message has been deleted because it violates OpenAi rules"] .
+ */
+  _deleteMsg(message, reason = "Your message has been deleted because it violates OpenAi rules") {
+    if (message) {
+      message.delete()
+        .then(() => {
+          this._sendToChannel(this.defaultChannel, reason);
+        })
+        .catch((error) => {
+          console.error('Error deleting message:', error);
+        });
+    }
+  }
+
 
   get defaultChannel() {
     return this.guild && this.guild.id === this._serverID ? this.guild?.systemChannel : null;
