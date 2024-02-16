@@ -25,7 +25,7 @@ class BotManager {
   constructor(discordBotToken, server_ID, openai_KEY) {
     /** @private */
     this.showHistoryCommand = "!showMyChatHistory";
-     /** @private */
+    /** @private */
     this._excludeArray = [this.showHistoryCommand];
     /** @private */
     this.strikeInterval = 3;
@@ -82,11 +82,11 @@ class BotManager {
    */
   _announcePresence() {
     const botName = this._client.user.displayName;
-   
-    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` + 
-            `**type @${botName} followed by your prompt**. ` +
-            `To see your history, **type @${botName} ${this.showHistoryCommand}** ` + 
-            `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
+
+    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` +
+      `**type @${botName} followed by your prompt**. ` +
+      `To see your history, **type @${botName} ${this.showHistoryCommand}** ` +
+      `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
 
     this._sendToChannel(this.defaultChannel, msg);;
   }
@@ -138,7 +138,7 @@ class BotManager {
 
 
     }
-  
+
     //  We don't send a message if:
     // - we sent the last message
     // - we haven't been mentioned in the last message
@@ -162,20 +162,20 @@ class BotManager {
  * @param {boolean} [isDirectMessage=false] - Flag indicating whether the content should be sent as a direct message to a user.
  * @returns {Promise<void>} - A Promise that resolves when the monitoring process is complete.
  */
-async _moderateUserPrompt(content, message, isDirectMessage=false) {
-  const moderations = await this._openAi.moderatePrompt(content);
-  const messageContent = parseUserMentionAndMessage(content).messageContent;
+  async _moderateUserPrompt(content, message, isDirectMessage = false) {
+    const moderations = await this._openAi.moderatePrompt(content);
+    const messageContent = parseUserMentionAndMessage(content).messageContent;
 
-  if (moderations.length && !this._isTextInExcludeList(messageContent)) {
+    if (moderations.length && !this._isTextInExcludeList(messageContent)) {
 
-    this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
-    return;
+      this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
+      return;
+    }
+
+    if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
+      await this._queryOpenAi(messageContent, message)
+    };
   }
-
-  if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
-    await this._queryOpenAi(messageContent, message)
-  };
-}
 
 
   /**
@@ -249,14 +249,14 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
    * @param {Message} message - The Discord message object representing the message triggering the query.
    */
   async _queryOpenAi(prompt, message) {
-    
+
     this._showBotTyping(message);
     const waitMsg = await this._sendToChannel(
       this.defaultChannel,
       "Fetching response, please wait...."
     );
 
-    
+
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
       if (!reply || (reply && !reply.length)) {
         this._sendToChannel(
@@ -265,7 +265,7 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
         );
       }
 
-     
+
       this._sendToChannel(message.channel, `\n <@${message.author.id}> ${reply}`);
 
       waitMsg.delete(); // delete the message once the we get data or regardless whether we get the data
@@ -286,13 +286,13 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
     const chatHistory = this._openAi.getUserHistory(message.author.username);
 
     this._showBotTyping(message);
-    
+
     // Check if there's no chat history available
     if (!chatHistory.length) {
       return await this._sendToChannel(this.defaultChannel, "There are no chats to view!");
     }
 
-  
+
     const loadingMessage = await this._sendToChannel(
       this.defaultChannel,
       `Fetching chat history from ${message.author.username}'s account...`
@@ -393,7 +393,7 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
    * @param {Message} message - The message object representing the context of the command.
    * @returns {Promise<void>} - A Promise that resolves when the typing status is displayed.
   */
-  async  _showBotTyping(message) {
+  async _showBotTyping(message) {
     await message.channel.sendTyping();
   }
 
