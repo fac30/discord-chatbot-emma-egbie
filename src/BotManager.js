@@ -2,19 +2,15 @@ const {
   Client,
   GatewayIntentBits,
   Events,
+  EmbedBuilder,
   TextChannel,
   Message,
   GuildMember,
-  EmbedBuilder,
   User,
 } = require("discord.js");
 
 const OpenAiManager = require("./OpenAiManager");
 const { changeStringToTitle, parseUserMentionAndMessage } = require("./utils.js");
-
-const showHistoryCommand = "!showMyChatHistory";
-const strikeInterval = 3;
-const currentTimeNow = Date.now();
 
 /**
  * Represents a manager for a Discord bot, responsible for initializing the bot,
@@ -27,6 +23,13 @@ class BotManager {
    * @param {string} server_ID - The ID of the server where the bot will operate.
    */
   constructor(discordBotToken, server_ID, openai_KEY) {
+    /** @private */
+    this.showHistoryCommand = "!showMyChatHistory";
+     /** @private */
+     this._excludeArray = [this.showHistoryCommand];
+    /** @private */
+    this.strikeInterval = 3;
+
     /** @private */
     this._client = new Client({
       intents: [
@@ -46,7 +49,6 @@ class BotManager {
     this._initialized = false;
     /** @private */
     this._lastMessageTime;
-
     /**@private */
     this._userStrikes = {};
 
@@ -80,8 +82,13 @@ class BotManager {
    */
   _announcePresence() {
     const botName = this._client.user.displayName;
-    const msg = `Hello everyone! I'm the ${botName}, now online and ready to chat. To chat with me, type @${botName} followed by your prompt. To see your history, type @${botName} ${showHistoryCommand}.`;
-    this._sendToChannel(this.defaultChannel, msg);
+   
+    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` + 
+            `**type @${botName} followed by your prompt**. ` +
+            `To see your history, **type @${botName} ${this.showHistoryCommand}** ` + 
+            `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
+
+    this._sendToChannel(this.defaultChannel, msg);;
   }
 
   /**
@@ -101,37 +108,78 @@ class BotManager {
    * @private
    */
   async _onMessageCreate(message) {
-    const author = message.author.id;
-    const content = message.content;
-    const hasBeenMentioned = message.mentions.has(this._client.user.id);
-    const isSameAuthor = author === this._client.application.id;
-    const waitTimeLimit = 3000;
+    const author                   = message.author.id;
+    const content                  = message.content;
+    const hasBeenMentioned         = message.mentions.has(this._client.user.id);
+    const isSameAuthor             = author === this._client.application.id;
+    const currentTime              = Date.now();
+    const waitTimeLimit            = 3000;
+    const hasTalkedRecently        = this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
+    let { userId, messageContent } = parseUserMentionAndMessage(content);
+    let isDirectMessage            = (userId != this._client.application.id && messageContent && !this._isTextInExcludeList(messageContent));
+     
+  
+    if (author !== this._client.application.id) {
+      
+      this._moderateUserPrompt(content, message, isDirectMessage);
 
-    const hasTalkedRecently =
-      this._lastMessageTime && Date.now() - this._lastMessageTime < waitTimeLimit;
+      switch(true) {
 
+        case isDirectMessage:
+          this._sendDirectMessageToUser(userId, messageContent);
+          break;
+        
+        case (messageContent.trim() === this.showHistoryCommand):
+          await this._showUserChatHistory(message, currentTime);
+          break;          
+                  
+      }
+     
+                    
+    }
+  
     //  We don't send a message if:
     // - we sent the last message
     // - we haven't been mentioned in the last message
     // - we already replied in the last 3 seconds
+    //
+    // The line has to be at the bottom because if it is at the top, it prevents the other actions from executing.
+    // This is because it checks if the user has already been interacted with (talked to, mentioned, or talked to recently),
+    // and if so, the preceding if statement is not triggered. This means that the actions involving OpenAI, sending messages,
+    // and showing history are delayed until after a 3 seconds since there are not called because of the return statement.
     if (isSameAuthor || hasTalkedRecently || !hasBeenMentioned) {
       return;
     }
-    const { messageContent } = parseUserMentionAndMessage(content);
-    if (messageContent.trim() === showHistoryCommand) {
-      // checks for the phrase "!showMyChatHistory" in order to display the user's history
-      this._showUserChatHistory(message);
-      return;
-    }
 
-    const moderations = await this._openAi.moderatePrompt(content);
-
-    if (moderations.length) {
-      this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
-    } else {
-      this._queryOpenAi(messageContent, message);
-    }
   }
+
+  /**
+ * Monitors user content for moderation and takes action accordingly.
+ * 
+ * @param {string} content - The content to monitor.
+ * @param {Message} message - The message object representing the context of the command.
+ * @param {boolean} [isDirectMessage=false] - Flag indicating to not send the message to openAi if the message is a DM.
+ * @returns {Promise<void>} - A Promise that resolves when the monitoring process is complete.
+ */
+async _moderateUserPrompt(content, message, isDirectMessage=false) {
+
+  const moderations = await this._openAi.moderatePrompt(content);
+  const messageContent = parseUserMentionAndMessage(content).messageContent;
+
+  this._showBotTyping(message);
+  
+  if (moderations.length && !this._isTextInExcludeList(messageContent)) {
+      
+      this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
+      return;
+  } 
+
+  if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
+    await this._queryOpenAi(messageContent, message)
+  };
+
+}
+
 
   /**
    * Sends
@@ -157,14 +205,14 @@ class BotManager {
 
     // if the user exceed the strike interval, and for every time they exceed it
     if (
-      this._userStrikes[username] > strikeInterval &&
-      this._userStrikes[username] % strikeInterval === 1
+      this._userStrikes[username] > this.strikeInterval &&
+      this._userStrikes[username] % this.strikeInterval === 1
     ) {
       const member = await this.guild.members.fetch({ user });
       try {
         // increments the time the user is timed out for depending of how many strikes they have.
         // but it doesn't exceed one hour.
-        const timeoutDuration = Math.min(strikeInterval ** 2 * 1000, 3600 * 1000);
+        const timeoutDuration = Math.min(this.strikeInterval ** 2 * 1000, 3600 * 1000);
         await member.timeout(timeoutDuration, "Violating speech terms.");
       } catch (e) {
         console.error(
@@ -185,10 +233,9 @@ class BotManager {
     if (!user) {
       console.log(`User with ID ${userID} does not exist.`);
       return;
-    }
+    } 
 
-    user
-      .send(message)
+    user.send(message)
       .then(() => {
         console.log("The message was sent successfully.");
       })
@@ -204,10 +251,14 @@ class BotManager {
    * @param {Message} message - The Discord message object representing the message triggering the query.
    */
   async _queryOpenAi(prompt, message) {
+    
+    this._showBotTyping(message);
     const waitMsg = await this._sendToChannel(
       this.defaultChannel,
       "Fetching response, please wait...."
     );
+
+    
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
       if (!reply || (reply && !reply.length)) {
         this._sendToChannel(
@@ -216,6 +267,7 @@ class BotManager {
         );
       }
 
+     
       this._sendToChannel(message.channel, `\n <@${message.author.id}> ${reply}`);
 
       waitMsg.delete(); // delete the message once the we get data or regardless whether we get the data
@@ -228,22 +280,27 @@ class BotManager {
    * Users can request their entire chat history by issuing the command "!showMyChatHistory" in Discord.
    *
    * @param {Message} message The message object representing the command invocation.
+   * @param {number} currentTime the current time
    * @returns {Promise<void>} A promise that resolves once the chat history is displayed.
    */
-  async _showUserChatHistory(message) {
+  async _showUserChatHistory(message, currentTime) {
+
     const chatHistory = this._openAi.getUserHistory(message.author.username);
 
+    this._showBotTyping(message);
+    
     // Check if there's no chat history available
     if (!chatHistory.length) {
       return await this._sendToChannel(this.defaultChannel, "There are no chats to view!");
     }
 
+  
     const loadingMessage = await this._sendToChannel(
       this.defaultChannel,
       `Fetching chat history from ${message.author.username}'s account...`
     );
 
-    const popupEmbed = await this._createEmbeddedChatHistory(chatHistory, message);
+    const popupEmbed = await this._createEmbeddedChatHistory(chatHistory, message, currentTime);
     await loadingMessage.edit({ content: "Here is your chat history:", embeds: [popupEmbed] });
   }
 
@@ -251,9 +308,10 @@ class BotManager {
    * Creates an embedded representation of the provided chat history.
    * @param {string[][]} chatHistory The chat history to be embedded.
    * @param {Message} message The message object used for context, such as the author's username.
+   * @param {number} currentTime the current time
    * @returns {Promise<MessageEmbed>} A promise that resolves with the embedded chat history.
    */
-  async _createEmbeddedChatHistory(chatHistory, message) {
+  async _createEmbeddedChatHistory(chatHistory, message, currentTime) {
     // Extract question-answer pairs from the chat history
     const fields = this._generateFieldsFromQAPairs(chatHistory);
 
@@ -262,7 +320,7 @@ class BotManager {
       .setTitle("User Chat History")
       .setAuthor({ name: `Bot name: ${this._openAi.name}` })
       .setColor("DarkRed")
-      .setTimestamp(currentTimeNow)
+      .setTimestamp(currentTime)
       .setFooter({ text: message.author.username })
       .addFields(fields);
 
@@ -283,7 +341,7 @@ class BotManager {
       // Create an object representing a field and push it to the fields array
       fields.push({
         name: `Q:  ${changeStringToTitle(question)}`,
-        value: `A:  ${answer}`,
+        value: `**A: **  ${answer}`,
         inline: false,
       });
 
@@ -329,6 +387,26 @@ class BotManager {
 
       return "";
     }
+  }
+
+/**
+ * Checks if a given text is included in the exclusion list.
+ * 
+ * @param {string} text - The text to check against the exclusion list.
+ * @returns {boolean} - Returns true if the text is found in the exclusion list, false otherwise.
+ */
+  _isTextInExcludeList(text) {
+    return this._excludeArray.includes(text);
+  }
+
+  /**
+   * Asynchronously displays typing status for the bot in the given message's channel.
+   * 
+   * @param {Message} message - The message object representing the context of the command.
+   * @returns {Promise<void>} - A Promise that resolves when the typing status is displayed.
+  */
+  async  _showBotTyping(message) {
+    await message.channel.sendTyping();
   }
 
   get defaultChannel() {
