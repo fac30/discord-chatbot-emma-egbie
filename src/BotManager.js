@@ -166,8 +166,6 @@ async _moderateUserPrompt(content, message, isDirectMessage=false) {
   const moderations = await this._openAi.moderatePrompt(content);
   const messageContent = parseUserMentionAndMessage(content).messageContent;
 
-  this._showBotTyping(message);
-  
   if (moderations.length && !this._isTextInExcludeList(messageContent)) {
       
       this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
