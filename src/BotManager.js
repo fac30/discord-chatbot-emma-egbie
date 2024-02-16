@@ -166,7 +166,7 @@ class BotManager {
     const moderations = await this._openAi.moderatePrompt(content);
     const messageContent = parseUserMentionAndMessage(content).messageContent;
 
-    if (moderations.length && !this._isTextInExcludeList(messageContent)) {
+    if (moderations.length) {
 
       this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
       this._deleteMsg(message);
