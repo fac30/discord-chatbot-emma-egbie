@@ -25,7 +25,7 @@ class BotManager {
   constructor(discordBotToken, server_ID, openai_KEY) {
     /** @private */
     this.showHistoryCommand = "!showMyChatHistory";
-    /** @private */
+     /** @private */
     this._excludeArray = [this.showHistoryCommand];
     /** @private */
     this.strikeInterval = 3;
@@ -82,11 +82,11 @@ class BotManager {
    */
   _announcePresence() {
     const botName = this._client.user.displayName;
-
-    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` +
-      `**type @${botName} followed by your prompt**. ` +
-      `To see your history, **type @${botName} ${this.showHistoryCommand}** ` +
-      `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
+   
+    const msg = `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` + 
+            `**type @${botName} followed by your prompt**. ` +
+            `To see your history, **type @${botName} ${this.showHistoryCommand}** ` + 
+            `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
 
     this._sendToChannel(this.defaultChannel, msg);;
   }
@@ -114,10 +114,11 @@ class BotManager {
     const isSameAuthor = author === this._client.application.id;
     const currentTime = Date.now();
     const waitTimeLimit = 3000;
-    const hasTalkedRecently = this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
-    let { userId, messageContent } = parseUserMentionAndMessage(content);
-    let isDirectMessage = (userId != this._client.application.id && messageContent && !this._isTextInExcludeList(messageContent));
 
+    const hasTalkedRecently = this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
+
+    const { userId, messageContent } = parseUserMentionAndMessage(content);
+    let isDirectMessage = (userId != this._client.application.id && messageContent && !this._isTextInExcludeList(messageContent));
 
     if (author !== this._client.application.id) {
 
@@ -129,7 +130,7 @@ class BotManager {
           this._sendDirectMessageToUser(userId, messageContent);
           break;
 
-        case (messageContent.trim() === this.showHistoryCommand):
+        case (messageContent && messageContent.trim() === this.showHistoryCommand):
           await this._showUserChatHistory(message, currentTime);
           break;
 
@@ -137,7 +138,7 @@ class BotManager {
 
 
     }
-
+  
     //  We don't send a message if:
     // - we sent the last message
     // - we haven't been mentioned in the last message
@@ -158,25 +159,23 @@ class BotManager {
  * 
  * @param {string} content - The content to monitor.
  * @param {Message} message - The message object representing the context of the command.
- * @param {boolean} [isDirectMessage=false] - Flag indicating to not send the message to openAi if the message is a DM.
+ * @param {boolean} [isDirectMessage=false] - Flag indicating whether the content should be sent as a direct message to a user.
  * @returns {Promise<void>} - A Promise that resolves when the monitoring process is complete.
  */
-  async _moderateUserPrompt(content, message, isDirectMessage = false) {
+async _moderateUserPrompt(content, message, isDirectMessage=false) {
+  const moderations = await this._openAi.moderatePrompt(content);
+  const messageContent = parseUserMentionAndMessage(content).messageContent;
 
-    const moderations = await this._openAi.moderatePrompt(content);
-    const messageContent = parseUserMentionAndMessage(content).messageContent;
+  if (moderations.length && !this._isTextInExcludeList(messageContent)) {
 
-    if (moderations.length && !this._isTextInExcludeList(messageContent)) {
-
-      this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
-      return;
-    }
-
-    if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
-      await this._queryOpenAi(messageContent, message)
-    };
-
+    this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
+    return;
   }
+
+  if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
+    await this._queryOpenAi(messageContent, message)
+  };
+}
 
 
   /**
@@ -233,7 +232,8 @@ class BotManager {
       return;
     }
 
-    user.send(message)
+    user
+      .send(message)
       .then(() => {
         console.log("The message was sent successfully.");
       })
@@ -249,14 +249,14 @@ class BotManager {
    * @param {Message} message - The Discord message object representing the message triggering the query.
    */
   async _queryOpenAi(prompt, message) {
-
+    
     this._showBotTyping(message);
     const waitMsg = await this._sendToChannel(
       this.defaultChannel,
       "Fetching response, please wait...."
     );
 
-
+    
     this._openAi.prompt(prompt, message.author.username).then((reply) => {
       if (!reply || (reply && !reply.length)) {
         this._sendToChannel(
@@ -265,7 +265,7 @@ class BotManager {
         );
       }
 
-
+     
       this._sendToChannel(message.channel, `\n <@${message.author.id}> ${reply}`);
 
       waitMsg.delete(); // delete the message once the we get data or regardless whether we get the data
@@ -286,13 +286,13 @@ class BotManager {
     const chatHistory = this._openAi.getUserHistory(message.author.username);
 
     this._showBotTyping(message);
-
+    
     // Check if there's no chat history available
     if (!chatHistory.length) {
       return await this._sendToChannel(this.defaultChannel, "There are no chats to view!");
     }
 
-
+  
     const loadingMessage = await this._sendToChannel(
       this.defaultChannel,
       `Fetching chat history from ${message.author.username}'s account...`
@@ -388,23 +388,23 @@ class BotManager {
   }
 
   /**
-   * Checks if a given text is included in the exclusion list.
-   * 
-   * @param {string} text - The text to check against the exclusion list.
-   * @returns {boolean} - Returns true if the text is found in the exclusion list, false otherwise.
-   */
-  _isTextInExcludeList(text) {
-    return this._excludeArray.includes(text);
-  }
-
-  /**
    * Asynchronously displays typing status for the bot in the given message's channel.
    * 
    * @param {Message} message - The message object representing the context of the command.
    * @returns {Promise<void>} - A Promise that resolves when the typing status is displayed.
   */
-  async _showBotTyping(message) {
+  async  _showBotTyping(message) {
     await message.channel.sendTyping();
+  }
+
+  /**
+ * Checks if a given text is included in the exclusion list.
+ * 
+ * @param {string} text - The text to check against the exclusion list.
+ * @returns {boolean} - Returns true if the text is found in the exclusion list, false otherwise.
+ */
+  _isTextInExcludeList(text) {
+    return this._excludeArray.includes(text);
   }
 
   get defaultChannel() {
