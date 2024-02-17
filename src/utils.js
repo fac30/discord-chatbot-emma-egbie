@@ -5,17 +5,15 @@
  * @returns {object} An object containing the user ID and message content.
  */
 function parseUserMentionAndMessage(messageObj) {
-
   const regex = /<@&?(\d+)> ?(.*)/;
   const match = messageObj.match(regex);
- 
+
   // Extract userId and messageContent from the match, if any
   const userId = match ? match[1] : null;
   const messageContentAfterMention = match ? match[2].trim() : null;
 
   return { userId, messageContent: messageContentAfterMention };
 }
-
 
 function changeStringToTitle(string) {
   return string[0].toUpperCase() + string.slice(1);
