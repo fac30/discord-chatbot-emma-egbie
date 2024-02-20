@@ -71,7 +71,6 @@ login() {
 
   return new Promise((resolve, reject) => {
       this._client.once(Events.ClientReady, () => {
-          console.log(Events.ClientReady);
           this._initialized = true;
           this._openAi.setName(this._client.user.displayName);
           this._announcePresence();
