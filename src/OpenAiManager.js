@@ -25,30 +25,37 @@ class OpenAiManager {
    * Gets a response from chatgpt for a given prompt.
    * Caches previous responses.
    * Doesn't allow too frequent calls to prevent spam.
+   * Handles errors
    * @param {string} userPrompt
    * @returns
    */
   async prompt(userPrompt, user = "default") {
-    // if we previously have a response, we return it instead
-    if (this._cache[user]?.[userPrompt] !== undefined) {
-      return this._cache[user][userPrompt];
+    try {
+      // if we previously have a response, we return it instead
+      if (this._cache[user]?.[userPrompt] !== undefined) {
+        return this._cache[user][userPrompt];
+      }
+
+      const timeNow = Date.now();
+      const waitTimeLimit = 3000; //  variable name so it does look like a "magic number" known in programming
+
+      //we don't submit a prompt unless it's been more than 3 seconds.
+      if (this._lastMessageTime && timeNow - this._lastMessageTime < waitTimeLimit) {
+        return "";
+      }
+
+      const messages = this._constructMessage(userPrompt, user);
+      const result = await this._generateReply(messages);
+      this.updateCache(user, userPrompt, result);
+      this._updateLastMessageTime(timeNow);
+
+      return result;
+    } catch (error) {
+      console.error("Error occurred during prompt:", error);
+      // Handle the error, perhaps by providing a fallback response or informing the user.
+      return "Sorry, something went wrong. Please try again later.";
     }
-
-    const timeNow = Date.now();
-    const waitTimeLimit = 3000; //  variable name so it does look like a "magic number" known in programming
-
-    //we don't submit a prompt unless it's been more than 3 seconds.
-    if (this._lastMessageTime && timeNow - this._lastMessageTime < waitTimeLimit) {
-      return "";
-    }
-
-    const messages = this._constructMessage(userPrompt, user);
-    const result = await this._generateReply(messages);
-    this.updateCache(user, userPrompt, result);
-    this._updateLastMessageTime(timeNow);
-
-    return result;
-  }
+  } 
 
   /**
    * Runs the user prompt through the moderations api.
