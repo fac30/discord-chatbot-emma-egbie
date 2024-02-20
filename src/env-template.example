@@ -1,0 +1,9 @@
+// File keeping tabs on the environment variables in use.
+// Copy them in an .env file & fill them in with your variables
+
+// DO NOT COMMIT YOUR OWN .env FILE!
+// DO NOT PUT/COMMIT ANY REAL KEYS IN THIS FILE (.env-template)
+
+DISCORD_BOT_TOKEN=YOUR_TOKEN_HERE
+OPEN_AI_KEY=sk-YOUR_KEY_HERE
+SERVER_ID=YOUR_ID_HERE
