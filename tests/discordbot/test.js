@@ -109,9 +109,19 @@ class BotManagerTestSuite {
      * Runs all tests in the suite.
      */
     async runTests() {
-        test.describe("The bot should be initialized after login", () => this.testBotInitializationSuccess());
-        test.describe("The bot shouldn't initialize with incorrect login details", () => this.testBotInitializationWithInvalidDisbotToken());
-        test.describe("The bot shouldn't initialize with an empty discord bot token", () => this.testBotInitializationWithEmptyDisbotToken())
+        test.describe("testBotInitializationSuccess", () => {
+            test("The bot should be initialized after login", () => this.testBotInitializationSuccess());
+        })
+      
+        test.describe("testBotInitializationWithInvalidDisbotToken", () => {
+            test("The bot shouldn't initialize with incorrect login details", () => this.testBotInitializationWithInvalidDisbotToken());
+
+        })
+
+        test.describe("testBotInitializationWithEmptyDisbotToken", () =>  {
+            test("The bot shouldn't initialize with an empty discord bot token", () => this.testBotInitializationWithEmptyDisbotToken());
+        });
+       
     }
 }
 
