@@ -58,6 +58,19 @@ class BotManagerTestSuite {
         }
     }
 
+     /**
+     * Tests bot initialization with an empty Discord bot token.
+     */
+    async testBotInitializationWithEmptyDisbotToken() {
+        const discordBot = new BotManager("", SERVER_ID, OPEN_AI_KEY);
+
+        try {
+            await discordBot.login();
+            assert.fail("Expected the test to fail but the test succeeded");
+        } catch (error) {
+            assert.ok(error instanceof Error, 'BotManager initialization should throw an error with an empty token.');
+        }
+    }
     
 
     /**
@@ -66,6 +79,7 @@ class BotManagerTestSuite {
     async runTests() {
         // test.describe("The bot should be initialized after login", () => this.testBotInitializationSuccess());
         test.describe("The bot shouldn't initialize with incorrect login details", () => this.testBotInitializationWithInvalidDisbotToken());
+        test.describe("The bot shouldn't initialize with an empty discord bot token", () => this.testBotInitializationWithEmptyDisbotToken())
     }
 }
 
