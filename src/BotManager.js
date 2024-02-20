@@ -58,29 +58,40 @@ class BotManager {
     this._client.on(Events.GuildMemberRemove, this._announceMemberLeave.bind(this));
   }
 
+
   /**
-   * Logs the bot in.
-   * Sends a greeting message to the system channel of the server when the bot connects to Discord for the first time.
-   */
-  login() {
-    if (this._initialized) {
-      return;
-    }
-
-    this._client.once(Events.ClientReady, () => {
-      this._initialized = true;
-      this._openAi.setName(this._client.user.displayName);
-      this._announcePresence();
-    });
-
-    this._client.login(this._discordBotToken);
+ * Logs the bot into Discord.
+ * 
+ * @returns {Promise} A promise that resolves when the bot is initialized, or rejects if login fails.
+ */
+login() {
+  if (this._initialized) {
+      return Promise.resolve(); // Resolve immediately if already initialized
   }
+
+  return new Promise((resolve, reject) => {
+      this._client.once(Events.ClientReady, () => {
+          console.log(Events.ClientReady);
+          this._initialized = true;
+          this._openAi.setName(this._client.user.displayName);
+          this._announcePresence();
+          resolve(); 
+      });
+
+      // Login to Discord
+      this._client.login(this._discordBotToken)
+          .catch(reject); 
+  });
+}
+
+ 
+  
 
   /**
    * Announces the bot's presence by sending a message in the default channel
    * @private
    */
-  _announcePresence() {
+  async _announcePresence() {
     const botName = this._client.user.displayName;
 
     const msg =
@@ -172,7 +183,7 @@ class BotManager {
     }
 
     if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
-      await this._queryOpenAi(messageContent, message);
+      return await this._queryOpenAi(messageContent, message);
     }
   }
 
@@ -208,7 +219,7 @@ class BotManager {
         // increments the time the user is timed out for depending of how many strikes they have.
         // but it doesn't exceed one hour.
         const timeoutDuration = Math.min(this.strikeInterval ** 2 * 1000, 3600 * 1000);
-        await member.timeout(timeoutDuration, "Violating speech terms.");
+        return await member.timeout(timeoutDuration, "Violating speech terms.");
       } catch (e) {
         console.error(
           "Cannot timeout member. Could be because member has a higher role than the bot."
