@@ -27,7 +27,9 @@ class BotManagerTestSuite {
         this.discordBot = new BotManager(DISCORD_BOT_TOKEN, SERVER_ID, OPEN_AI_KEY);
     }
 
-
+    tearDown() {
+        this.discordBot.logout();
+    }
     /**
      * Tests the successful initialization of the bot.
      */
