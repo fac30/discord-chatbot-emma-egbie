@@ -24,9 +24,9 @@ class BotManager {
    */
   constructor(discordBotToken, server_ID, openai_KEY) {
     /** @private */
-    this.showHistoryCommand = "!showMyChatHistory";
+    this._showHistoryCommand = "!showMyChatHistory";
     /** @private */
-    this._excludeArray = [this.showHistoryCommand];
+    this._excludeArray = [this._showHistoryCommand];
     /** @private */
     this.strikeInterval = 3;
 
@@ -51,6 +51,7 @@ class BotManager {
     this._lastMessageTime;
     /**@private */
     this._userStrikes = {};
+    this.botName = null;
 
     // hook up event listeners here
     this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
@@ -64,42 +65,41 @@ class BotManager {
  * 
  * @returns {Promise} A promise that resolves when the bot is initialized, or rejects if login fails.
  */
-login() {
-  if (this._initialized) {
+  login() {
+    if (this._initialized) {
       return Promise.resolve(); // Resolve immediately if already initialized
-  }
+    }
 
-  return new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       this._client.once(Events.ClientReady, () => {
-          this._initialized = true;
-          this._openAi.setName(this._client.user.displayName);
-          this._announcePresence();
-          resolve(); 
+
+        this._initialized = true;
+        const botName = this._client.user.displayName;
+        this._openAi.setName(botName); //set to the openAi class
+        this.setBotname(botName);      // set to the botManager class 
+        this._announcePresence();
+        resolve();
       });
 
       // Login to Discord
       this._client.login(this._discordBotToken)
-          .catch(reject); 
-  });
-}
-
- 
-  
+        .catch(reject);
+    });
+  }
 
   /**
    * Announces the bot's presence by sending a message in the default channel
    * @private
    */
   async _announcePresence() {
-    const botName = this._client.user.displayName;
 
     const msg =
-      `Hello everyone! I'm the **${botName}**, now online and ready to chat. To chat with me, ` +
-      `**type @${botName} followed by your prompt**. ` +
-      `To see your history, **type @${botName} ${this.showHistoryCommand}** ` +
+      `Hello everyone! I'm the **${this.botName}**, now online and ready to chat. To chat with me, ` +
+      `**type @${this.botName} followed by your prompt**. ` +
+      `To see your history, **type @${this.botName} ${this._showHistoryCommand}** ` +
       `and to send a **DM (direct message)** to the user type **@<username>  followed by your message**`;
 
-    this._sendToChannel(this.defaultChannel, msg);
+    return await this._sendToChannel(this.defaultChannel, msg);
   }
 
   /**
@@ -143,7 +143,7 @@ login() {
           this._sendDirectMessageToUser(userId, messageContent);
           break;
 
-        case messageContent && messageContent.trim() === this.showHistoryCommand:
+        case messageContent && messageContent.trim() === this._showHistoryCommand:
           await this._showUserChatHistory(message, currentTime);
           break;
       }
@@ -240,8 +240,7 @@ login() {
       return;
     }
 
-    user
-      .send(message)
+    user.send(message)
       .then(() => {
         console.log("The message was sent successfully.");
       })
@@ -385,7 +384,6 @@ login() {
       return await channel.send(message);
     } catch (error) {
       console.error("Error sending message:", error.message);
-
       return "";
     }
   }
@@ -426,6 +424,29 @@ login() {
           console.error("Error deleting message:", error);
         });
     }
+  }
+
+  /**
+   * logs the bot out of the server
+   */
+  async logout() {
+    try {
+      if (this._client) {
+        await this._client.destroy();
+      }
+      
+      console.log("Bot logged out successfully.");
+    } catch (error) {
+      console.error("Error logging out:", error);
+    }
+  }
+  /**
+   * Sets the name of the bot to the botManager class.
+   * 
+   * @param {string} botName - The name to set for the bot.
+   */
+  setBotname(botName) {
+    this.botName = botName;
   }
 
   get defaultChannel() {
