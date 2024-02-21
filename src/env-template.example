@@ -3,7 +3,6 @@
 
 // DO NOT COMMIT YOUR OWN .env FILE!
 // DO NOT PUT/COMMIT ANY REAL KEYS IN THIS FILE (.env-template)
-// This .env file should be inside the src folder not outside
 
 DISCORD_BOT_TOKEN=YOUR_TOKEN_HERE
 OPEN_AI_KEY=sk-YOUR_KEY_HERE

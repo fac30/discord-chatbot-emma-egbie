@@ -1,10 +1,11 @@
 {
   "name": "discord-chatbot-emma-egbie",
   "version": "1.0.0",
-  "description": "",
+  "description": "A FAC [discord ai chatbot](https://learn.foundersandcoders.com/course/syllabus/foundation/node/project/)\r Made by Emma & Egbie",
   "main": "index.js",
   "scripts": {
-    "start": "nodemon src/index.js"
+    "start": "nodemon src/index.js",
+    "test": "node tests/mainTestFile.js"
   },
   "keywords": [],
   "author": "",
@@ -20,5 +21,8 @@
     "eslint-plugin-prettier": "^5.1.3",
     "nodemon": "^3.0.3",
     "prettier": "^3.2.5"
+  },
+  "directories": {
+    "test": "tests"
   }
 }

@@ -58,11 +58,10 @@ class BotManager {
     this._client.on(Events.GuildMemberRemove, this._announceMemberLeave.bind(this));
   }
 
-
-  /**
- * Logs the bot into Discord.
- * 
- * @returns {Promise} A promise that resolves when the bot is initialized, or rejects if login fails.
+ /**
+ * Logs the bot in.
+ * Sends a greeting message to the system channel of the server when the bot connects to Discord for the first time.
+ * @returns {Promise} A promise that resolves when the bot is logged in, or rejects if login fails.
  */
 login() {
   if (this._initialized) {
@@ -74,17 +73,19 @@ login() {
           this._initialized = true;
           this._openAi.setName(this._client.user.displayName);
           this._announcePresence();
-          resolve(); 
+          resolve("login successful");
       });
 
       // Login to Discord
       this._client.login(this._discordBotToken)
-          .catch(reject); 
+          .then(() => {
+              resolve("login successful");
+          })
+          .catch((error) => {
+              reject(error); // Login failed, reject the promise with the error
+          });
   });
 }
-
- 
-  
 
   /**
    * Announces the bot's presence by sending a message in the default channel
