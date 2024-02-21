@@ -66,12 +66,12 @@ class BotManagerTestSuite {
 
             // Assert that the bot is initialized
             if (!this.discordBot._initialized) {
-                throw new Error("Bot initialization failed");
+                throw new Error("[-] Bot initialization failed");
             }
 
-            console.log("Bot initialization successful");
+            console.log("[+] Bot initialization successful");
         } catch (error) {
-            console.error("Bot initialization failed:", error.message);
+            console.error("[-] Bot initialization failed:", error.message);
         }
     }
 
