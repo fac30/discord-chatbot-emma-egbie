@@ -37,6 +37,7 @@ class BotManager {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
+      
       ],
     });
 
@@ -54,9 +55,11 @@ class BotManager {
     this.botName = null;
 
     // hook up event listeners here
+
     this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
     this._client.on(Events.GuildMemberAdd, this._announceNewMember.bind(this));
     this._client.on(Events.GuildMemberRemove, this._announceMemberLeave.bind(this));
+  
   }
 
 
@@ -130,14 +133,13 @@ class BotManager {
       this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
 
     const { userId, messageContent } = parseUserMentionAndMessage(content);
-    let isDirectMessage =
-      userId != this._client.application.id &&
-      messageContent &&
-      !this._isTextInExcludeList(messageContent);
+    let isDirectMessage = userId != this._client.application.id && messageContent && !this._isTextInExcludeList(messageContent);
 
     if (author !== this._client.application.id) {
-      this._moderateUserPrompt(content, message, isDirectMessage);
 
+     
+      this._moderateUserPrompt(content, message, isDirectMessage);
+      
       switch (true) {
         case isDirectMessage:
           this._sendDirectMessageToUser(userId, messageContent);
@@ -173,7 +175,7 @@ class BotManager {
    */
   async _moderateUserPrompt(content, message, isDirectMessage = false) {
     const moderations = await this._openAi.moderatePrompt(content);
-    const messageContent = parseUserMentionAndMessage(content).messageContent;
+    const {userId, messageContent} = parseUserMentionAndMessage(content);
 
     if (moderations.length) {
       this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
@@ -181,7 +183,9 @@ class BotManager {
       return;
     }
 
-    if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
+    // Only respond to messages where the bot's name is mentioned directly.
+    // If the message includes a mention of the bot's name, proceed with the necessary actions otherwise do nothing.
+    if (userId !== null && !isDirectMessage && !this._isTextInExcludeList(messageContent)) {
       return await this._queryOpenAi(messageContent, message);
     }
   }
@@ -233,7 +237,8 @@ class BotManager {
    * @param {string} message - The content of the message to be sent.
    */
   _sendDirectMessageToUser(userID, message) {
-    const user = this._client.users.cache?.get(userID);
+
+    const user = this._getUserByID(userID);
 
     if (!user) {
       console.log(`User with ID ${userID} does not exist.`);
@@ -415,8 +420,7 @@ class BotManager {
    */
   _deleteMsg(message, reason = "Your message has been deleted because it violates OpenAi rules") {
     if (message) {
-      message
-        .delete()
+      message.delete()
         .then(() => {
           this._sendToChannel(this.defaultChannel, reason);
         })
@@ -447,6 +451,17 @@ class BotManager {
    */
   setBotname(botName) {
     this.botName = botName;
+  }
+
+ 
+  /**
+   * Retrieves a Discord user object by user ID.
+   * 
+   * @param {string} userID - The ID of the user to retrieve.
+   * @returns {User | undefined} - The user object corresponding to the provided ID, or undefined if not found.
+ */
+  _getUserByID(userID) {
+    return this._client.users.cache?.get(userID);
   }
 
   get defaultChannel() {
