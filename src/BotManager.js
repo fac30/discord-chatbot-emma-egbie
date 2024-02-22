@@ -37,6 +37,7 @@ class BotManager {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
+      
       ],
     });
 
@@ -54,9 +55,11 @@ class BotManager {
     this.botName = null;
 
     // hook up event listeners here
+
     this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
     this._client.on(Events.GuildMemberAdd, this._announceNewMember.bind(this));
     this._client.on(Events.GuildMemberRemove, this._announceMemberLeave.bind(this));
+  
   }
 
 
@@ -130,14 +133,16 @@ class BotManager {
       this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
 
     const { userId, messageContent } = parseUserMentionAndMessage(content);
-    let isDirectMessage =
-      userId != this._client.application.id &&
-      messageContent &&
-      !this._isTextInExcludeList(messageContent);
+    let isDirectMessage = userId != this._client.application.id && messageContent && !this._isTextInExcludeList(messageContent);
 
     if (author !== this._client.application.id) {
-      this._moderateUserPrompt(content, message, isDirectMessage);
 
+      // Only respond to messages where the bot's name is mentioned directly.
+      // If the message includes a mention of the bot's name, proceed with the necessary actions otherwise do nothing.
+      if (userId != null) {
+        this._moderateUserPrompt(content, message, isDirectMessage);
+      }
+     
       switch (true) {
         case isDirectMessage:
           this._sendDirectMessageToUser(userId, messageContent);
