@@ -2,6 +2,8 @@
 const test = require('node:test');
 const assert = require('assert');
 const dotenv = require("dotenv").config();
+
+
 const BotManager = require('../../src/BotManager.js');
 
 const DISCORD_BOT_TOKEN = dotenv.parsed.DISCORD_BOT_TOKEN;
@@ -88,9 +90,9 @@ class BotManagerTestSuite {
      * the bot's presence message upon successful login.
      */
     async testSuccesfulBotLogin() {
+
         // Create a new instance of the BotManager with valid credentials
         const testDiscordBot = new BotManager(DISCORD_BOT_TOKEN, SERVER_ID, OPEN_AI_KEY);
-
 
         await testDiscordBot.login();
 
@@ -143,7 +145,7 @@ class BotManagerTestSuite {
      * Runs all tests in the suite.
      */
     async runTests() {
-
+        console.log("[+] Starting tests, please wait....")
         try {
             await test.describe("testSuccesfulBotLogin", () => {
                 test("Once logged into the discord server the bot should greet the user with a message", () => this.testSuccesfulBotLogin());
@@ -162,9 +164,10 @@ class BotManagerTestSuite {
             });
 
         } catch (error) {
-            console.log("[-] Something went wrong with the test with running the tests!!")
+            console.log("[-] Something went wrong with running the tests!!")
         } finally {
             this.tearDown();
+           
         }
 
 
