@@ -137,12 +137,9 @@ class BotManager {
 
     if (author !== this._client.application.id) {
 
-      // Only respond to messages where the bot's name is mentioned directly.
-      // If the message includes a mention of the bot's name, proceed with the necessary actions otherwise do nothing.
-      if (userId != null) {
-        this._moderateUserPrompt(content, message, isDirectMessage);
-      }
      
+      this._moderateUserPrompt(content, message, isDirectMessage);
+      
       switch (true) {
         case isDirectMessage:
           this._sendDirectMessageToUser(userId, messageContent);
@@ -178,7 +175,7 @@ class BotManager {
    */
   async _moderateUserPrompt(content, message, isDirectMessage = false) {
     const moderations = await this._openAi.moderatePrompt(content);
-    const messageContent = parseUserMentionAndMessage(content).messageContent;
+    const {userId, messageContent} = parseUserMentionAndMessage(content);
 
     if (moderations.length) {
       this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
@@ -186,8 +183,14 @@ class BotManager {
       return;
     }
 
-    if (!isDirectMessage && !this._isTextInExcludeList(messageContent)) {
-      return await this._queryOpenAi(messageContent, message);
+    switch(true) {
+      // Only respond to messages where the bot's name is mentioned directly.
+      // If the message includes a mention of the bot's name, proceed with the necessary actions otherwise do nothing.
+      case (userId === null):
+        return;
+      case (!isDirectMessage && !this._isTextInExcludeList(messageContent)):
+        return await this._queryOpenAi(messageContent, message);
+
     }
   }
 
@@ -238,7 +241,7 @@ class BotManager {
    * @param {string} message - The content of the message to be sent.
    */
   _sendDirectMessageToUser(userID, message) {
-    
+
     const user = this._getUserByID(userID);
 
     if (!user) {
@@ -421,8 +424,7 @@ class BotManager {
    */
   _deleteMsg(message, reason = "Your message has been deleted because it violates OpenAi rules") {
     if (message) {
-      message
-        .delete()
+      message.delete()
         .then(() => {
           this._sendToChannel(this.defaultChannel, reason);
         })
