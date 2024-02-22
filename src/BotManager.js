@@ -183,14 +183,10 @@ class BotManager {
       return;
     }
 
-    switch(true) {
-      // Only respond to messages where the bot's name is mentioned directly.
-      // If the message includes a mention of the bot's name, proceed with the necessary actions otherwise do nothing.
-      case (userId === null):
-        return;
-      case (!isDirectMessage && !this._isTextInExcludeList(messageContent)):
-        return await this._queryOpenAi(messageContent, message);
-
+    // Only respond to messages where the bot's name is mentioned directly.
+    // If the message includes a mention of the bot's name, proceed with the necessary actions otherwise do nothing.
+    if (userId !== null && !isDirectMessage && !this._isTextInExcludeList(messageContent)) {
+      return await this._queryOpenAi(messageContent, message);
     }
   }
 
