@@ -238,7 +238,8 @@ class BotManager {
    * @param {string} message - The content of the message to be sent.
    */
   _sendDirectMessageToUser(userID, message) {
-    const user = this._client.users.cache?.get(userID);
+    
+    const user = this._getUserByID(userID);
 
     if (!user) {
       console.log(`User with ID ${userID} does not exist.`);
@@ -452,6 +453,17 @@ class BotManager {
    */
   setBotname(botName) {
     this.botName = botName;
+  }
+
+ 
+  /**
+   * Retrieves a Discord user object by user ID.
+   * 
+   * @param {string} userID - The ID of the user to retrieve.
+   * @returns {User | undefined} - The user object corresponding to the provided ID, or undefined if not found.
+ */
+  _getUserByID(userID) {
+    return this._client.users.cache?.get(userID);
   }
 
   get defaultChannel() {
