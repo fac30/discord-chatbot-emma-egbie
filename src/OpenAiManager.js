@@ -55,7 +55,7 @@ class OpenAiManager {
       // Handle the error, perhaps by providing a fallback response or informing the user.
       return "Sorry, something went wrong. Please try again later.";
     }
-  } 
+  }
 
   /**
    * Runs the user prompt through the moderations api.
