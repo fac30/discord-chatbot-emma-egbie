@@ -189,7 +189,7 @@ class BotManagerTestSuite {
     async testBotResponseEventMessageListener() {
 
         const expectedMessage = "Hello";
-        const response        = await this._testSuccessfulGreetingMsgAfterLogin();
+        const response        = await this._testBotResponseEventMessageHelperFunction();
         const messageContent  = parseUserMentionAndMessage(response.content).messageContent;
 
         try {
@@ -214,7 +214,7 @@ class BotManagerTestSuite {
     async testBotResponseEventMessageListener_UnexpectedMessage() {
 
         const unExpectedMessage = "Unexpected message";
-        const response          = await this._testSuccessfulGreetingMsgAfterLogin();
+        const response          = await this._testBotResponseEventMessageHelperFunction();
 
         try {
 
@@ -243,7 +243,7 @@ class BotManagerTestSuite {
      * and `testBotResponseEventMessageListener` test cases to simulate the event message handling process
      * of the bot.
      */
-    async _testSuccessfulGreetingMsgAfterLogin() {
+    async _testBotResponseEventMessageHelperFunction() {
         const message = this._mockMessage;
         const testBot = new BotManager(DISCORD_BOT_TOKEN, SERVER_ID, "OPEN_AI_KEY");
 
@@ -256,7 +256,7 @@ class BotManagerTestSuite {
         stubbedOnMessageCreate.callsFake(async (message) => {
 
             return await this._mockOnMessageCreate(message);
-           
+            
         });
 
         const response = await testBot._onMessageCreate(message);
