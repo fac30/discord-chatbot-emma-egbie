@@ -4,13 +4,18 @@ const dotenv = require("dotenv").config();
 const { test, describe, beforeEach } = require("node:test");
 const OpenAiManager = require("../src/OpenAiManager");
 
-const RANDOM_KEY = "123";
+const API_TEST_KEY = "123";
 
 describe("environment variables", () => {
-  test("has values for the necessary environment variables", () => {
+  test("has values for the necessary environment variables, loaded from the .env file", () => {
     const OPEN_AI_KEY = dotenv.parsed.OPEN_AI_KEY;
-
     assert.ok(OPEN_AI_KEY.length > 0);
+  });
+
+  test("OpenAI instance has the same value key as the one passed in the constructor", () => {
+    const OPEN_AI_KEY = dotenv.parsed.OPEN_AI_KEY;
+    const openAiManager = new OpenAiManager(OPEN_AI_KEY);
+    assert.deepEqual(OPEN_AI_KEY, openAiManager._openAi.apiKey);
   });
 });
 
@@ -19,7 +24,7 @@ describe("getUserHistory", () => {
   let openAiManager;
 
   beforeEach(() => {
-    openAiManager = new OpenAiManager(RANDOM_KEY);
+    openAiManager = new OpenAiManager(API_TEST_KEY);
   });
 
   test("returns an empty list when there's no user history", () => {
@@ -32,16 +37,15 @@ describe("getUserHistory", () => {
     const testPrompt = "testPrompt";
     const testResponse = "testResponse";
 
-    test("returns the user prompts & replies if available", () => {
+    beforeEach(() => {
       openAiManager._cache = { [userName]: { [testPrompt]: testResponse } };
-
+    });
+    test("returns the user prompts & replies if available", () => {
       const messages = openAiManager.getUserHistory(userName);
       assert.deepEqual(messages, [[testPrompt, testResponse]]);
     });
 
     test("doesn't return the wrong user's chats", () => {
-      openAiManager._cache = { [userName]: { [testPrompt]: testResponse } };
-
       const messages = openAiManager.getUserHistory("faulty user name");
       assert.deepEqual(messages, []);
     });
@@ -57,7 +61,7 @@ describe("_getUserChats", () => {
   let openAiManager;
 
   beforeEach(() => {
-    openAiManager = new OpenAiManager(RANDOM_KEY);
+    openAiManager = new OpenAiManager(API_TEST_KEY);
 
     openAiManager._cache = { [userName]: { [testPrompt]: testResponse } };
   });
@@ -90,16 +94,58 @@ describe("_getUserChats", () => {
   });
 });
 
-// describe("_constructMessage", () => {
-//   /** @type {OpenAiManager} */
-//   let openAiManager;
+describe("_constructMessage", () => {
+  /** @type {OpenAiManager} */
+  let openAiManager;
 
-//   beforeEach(() => {
-//     openAiManager = new OpenAiManager("1234");
-//   });
+  function countUserPrompts(apiMessages) {
+    let systemMessagesCount = 0;
+    let assistantMessagesCount = 0;
+    let userMessagesCount = 0;
 
-//   test("there are the correct number of system, assistant and user messages for a given user prompt", () => {
-//     const userChats
+    apiMessages.forEach(({ role }) => {
+      switch (role) {
+        case "system":
+          return systemMessagesCount++;
+        case "assistant":
+          return assistantMessagesCount++;
+        case "user":
+          return userMessagesCount++;
+      }
+    });
 
-//   });
-// });
+    return { systemMessagesCount, assistantMessagesCount, userMessagesCount };
+  }
+  beforeEach(() => {
+    openAiManager = new OpenAiManager(API_TEST_KEY);
+  });
+
+  test("there are the correct number of system, assistant and user messages for a given user prompt", () => {
+    const userName = "userName";
+    const testPrompt = "testPrompt";
+    const testResponse = "testResponse";
+
+    openAiManager._cache = { [userName]: { [testPrompt]: testResponse } };
+
+    const { systemMessagesCount, assistantMessagesCount, userMessagesCount } = countUserPrompts(
+      openAiManager._constructMessage("prompt", userName)
+    );
+
+    assert.deepEqual(systemMessagesCount, 2);
+    assert.deepEqual(assistantMessagesCount, 2);
+    assert.deepEqual(userMessagesCount, 1);
+  });
+
+  test("there are the correct number of system, assistant and user messages for a given user prompt, when the user has history", () => {
+    const testUser = "testUser";
+    const testPrompt = "testPrompt";
+
+    const { systemMessagesCount, assistantMessagesCount, userMessagesCount } = countUserPrompts(
+      openAiManager._constructMessage(testPrompt, testUser)
+    );
+
+    assert.deepEqual(systemMessagesCount, 2);
+    assert.deepEqual(assistantMessagesCount, 1);
+    assert.deepEqual(userMessagesCount, 1);
+  });
+});
