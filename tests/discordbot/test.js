@@ -255,8 +255,8 @@ class BotManagerTestSuite {
         // Set up the stubbedOnMessageCreate to execute custom logic
         stubbedOnMessageCreate.callsFake(async (message) => {
 
-            const mockResponse = await this._mockOnMessageCreate(message);
-            return mockResponse;
+            return await this._mockOnMessageCreate(message);
+           
         });
 
         const response = await testBot._onMessageCreate(message);
