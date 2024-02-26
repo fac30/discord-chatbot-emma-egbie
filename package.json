@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon src/index.js",
-    "test": "node tests/mainTestFile.js"
+    "test": "node --test tests/mainTestFile.js",
+    "test-openai": "nodemon --test tests/openAi/openai.test.js"
   },
   "keywords": [],
   "author": "",

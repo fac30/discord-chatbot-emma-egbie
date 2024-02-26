@@ -20,9 +20,8 @@
 // To run the tests, navigate to the test folder and run:
 // node ./mainTestFile.js
 
-
 // Importing the DiscordBotTestSuite from the discordbot folder
-const DiscordBotTestSuite = require('./discordbot/test.js');
+const DiscordBotTestSuite = require("./discordbot/test.js");
 
 // Importing other test suites if needed - uncomment this once the appropriate classes have been created
 // const OpenAiTestSuite = require('./openaiTest/test.js');
@@ -33,8 +32,7 @@ const botTestSuite = new DiscordBotTestSuite();
 // const openAiTestSuite = new OpenAiTestSuite();
 // const integrationTestSuite = new IntegrationTestSuite();
 
-
 // Run all test suites
 botTestSuite.runTests();
-// openAiTestSuite.runTests();
+require("./openAi/openAi.test.js");
 // integrationTestSuite.runTests();

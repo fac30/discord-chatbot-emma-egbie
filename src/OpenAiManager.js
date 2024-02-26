@@ -19,6 +19,9 @@ class OpenAiManager {
     this._cache = {};
     this.name = "discord chatbot";
     this._lastMessageTime = null;
+
+    /** @private */
+    this.waitTimeLimit = 3000;
   }
 
   /**
@@ -26,27 +29,28 @@ class OpenAiManager {
    * Caches previous responses.
    * Doesn't allow too frequent calls to prevent spam.
    * Handles errors
-   * @param {string} userPrompt
-   * @returns
+   * @param {string} userPrompt prompt of the user (their message to the chatbot)
+   *  @param {string} userName username
+   * @returns {Promise<string}
    */
-  async prompt(userPrompt, user = "default") {
+  async prompt(userPrompt, userName) {
     try {
       // if we previously have a response, we return it instead
-      if (this._cache[user]?.[userPrompt] !== undefined) {
-        return this._cache[user][userPrompt];
+      if (this._cache[userName]?.[userPrompt] !== undefined) {
+        return this._cache[userName][userPrompt];
       }
 
       const timeNow = Date.now();
-      const waitTimeLimit = 3000; //  variable name so it does look like a "magic number" known in programming
+      //  variable name so it does look like a "magic number" known in programming
 
       //we don't submit a prompt unless it's been more than 3 seconds.
-      if (this._lastMessageTime && timeNow - this._lastMessageTime < waitTimeLimit) {
+      if (this._lastMessageTime && timeNow - this._lastMessageTime < this.waitTimeLimit) {
         return "";
       }
 
-      const messages = this._constructMessage(userPrompt, user);
+      const messages = this._constructMessage(userPrompt, userName);
       const result = await this._generateReply(messages);
-      this.updateCache(user, userPrompt, result);
+      this.updateCache(userName, userPrompt, result);
       this._updateLastMessageTime(timeNow);
 
       return result;
@@ -55,7 +59,7 @@ class OpenAiManager {
       // Handle the error, perhaps by providing a fallback response or informing the user.
       return "Sorry, something went wrong. Please try again later.";
     }
-  } 
+  }
 
   /**
    * Runs the user prompt through the moderations api.
@@ -119,8 +123,7 @@ class OpenAiManager {
 
       return completion.choices[0].message.content || "";
     } catch (error) {
-      console.error("Error while generating reply:", error);
-      return "";
+      throw new Error("Error while generating reply:", error);
     }
   }
 
