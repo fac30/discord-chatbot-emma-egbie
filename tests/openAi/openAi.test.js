@@ -11,8 +11,8 @@ const openAiMockModeration = require("./openAiModerationsMock.json");
 const API_TEST_KEY = "123";
 
 const userName = "userName";
-const testPrompt = "testPrompt";
-const testResponse = "testResponse";
+const userPrompt = "userPrompt";
+const openaiResponse = "openaiResponse";
 
 describe("environment variables", () => {
   test("has values for the necessary environment variables, loaded from the .env file", () => {
@@ -55,12 +55,12 @@ describe("OpenAiManager methods", () => {
 
     describe("existing user", () => {
       beforeEach(() => {
-        openAiManager._cache = { [userName]: { [testPrompt]: testResponse } };
+        openAiManager._cache = { [userName]: { [userPrompt]: openaiResponse } };
       });
 
       test("returns the user prompts & replies if available", () => {
         const messages = openAiManager.getUserHistory(userName);
-        assert.deepEqual(messages, [[testPrompt, testResponse]]);
+        assert.deepEqual(messages, [[userPrompt, openaiResponse]]);
       });
 
       test("doesn't return the wrong user's chats", () => {
@@ -72,7 +72,7 @@ describe("OpenAiManager methods", () => {
 
   describe("_getUserChats", () => {
     beforeEach(() => {
-      openAiManager._cache = { [userName]: { [testPrompt]: testResponse } };
+      openAiManager._cache = { [userName]: { [userPrompt]: openaiResponse } };
     });
 
     test("returns an empty string when no user is provided", () => {
@@ -87,8 +87,8 @@ describe("OpenAiManager methods", () => {
 
     test("returns the past user chats as a string", () => {
       const userChats = openAiManager._getUserChats(userName);
-      assert.ok(userChats.includes(testPrompt));
-      assert.ok(userChats.includes(testResponse));
+      assert.ok(userChats.includes(userPrompt));
+      assert.ok(userChats.includes(openaiResponse));
     });
 
     test("the userChats contains the appropriate number of Q: and A: ", () => {
@@ -134,7 +134,7 @@ describe("OpenAiManager methods", () => {
     });
 
     test("there are the correct number of system, assistant and user messages for a given user prompt, when the user has history", () => {
-      openAiManager._cache = { [userName]: { [testPrompt]: testResponse } };
+      openAiManager._cache = { [userName]: { [userPrompt]: openaiResponse } };
 
       const { systemMessagesCount, assistantMessagesCount, userMessagesCount } = countUserPrompts(
         openAiManager._constructMessage("prompt", userName)
@@ -165,18 +165,21 @@ describe("OpenAiManager methods", () => {
         }),
       });
 
-      const reply = await openAiManager._generateReply([]);
-      assert.deepEqual(reply, "");
+      assert.rejects(async () => await openAiManager._generateReply([]));
     });
   });
 
   describe("updateCache", () => {
     beforeEach(() => {
-      openAiManager.updateCache(userName, testPrompt, testResponse);
+      openAiManager = new OpenAiManager(API_TEST_KEY);
+    });
+
+    beforeEach(() => {
+      openAiManager.updateCache(userName, userPrompt, openaiResponse);
     });
 
     test("creates a new cache entry for a new user", () => {
-      assert.deepEqual(openAiManager._cache.userName.testPrompt, testResponse);
+      assert.deepEqual(openAiManager._cache[userName][userPrompt], openaiResponse);
     });
 
     test("updates the cache cache entry for an existing user", () => {
@@ -188,6 +191,9 @@ describe("OpenAiManager methods", () => {
   });
 
   describe("_updateLastMessageTime", () => {
+    beforeEach(() => {
+      openAiManager = new OpenAiManager(API_TEST_KEY);
+    });
     test("lastMessageTime is null to begin with", () => {
       assert.deepEqual(openAiManager._lastMessageTime, null);
     });
@@ -200,6 +206,10 @@ describe("OpenAiManager methods", () => {
   });
 
   describe("moderatePrompt", () => {
+    beforeEach(() => {
+      openAiManager = new OpenAiManager(API_TEST_KEY);
+    });
+
     test("returns all flagged moderation keywords", async () => {
       mockOpenAi({
         moderationsPromise: new Promise((resolve) => {
@@ -218,14 +228,65 @@ describe("OpenAiManager methods", () => {
   describe("prompt", () => {
     // on success
 
-    test("message is returned, cache and time are updated", () => {});
+    beforeEach(() => {
+      openAiManager = new OpenAiManager(API_TEST_KEY);
+    });
 
-    test("same message is returned from cache instead of passed through openAi", () => {});
+    test("message is returned, cache and time are updated", async () => {
+      mockOpenAi({
+        completionsPromise: new Promise((resolve) => {
+          resolve(openAiMockCompletion);
+        }),
+      });
 
-    test("cannot send a new message for 3 seconds after just having sent one", () => {});
+      const mockResponse = openAiMockCompletion.choices[0].message.content;
+      const response = await openAiManager.prompt(userPrompt, userName);
+      assert.deepEqual(response, mockResponse);
+      assert.deepEqual(openAiManager._cache[userName][userPrompt], mockResponse);
+      assert.ok(openAiManager._lastMessageTime !== null);
+    });
 
-    test("can get a cache message after sending a new message", () => {});
+    /**
+     * This function relies on the fact that when a new prompt is given, the _lastMessageTime isn't updated.
+     * This means that if we pass the same prompt, from the same user, the _lastMessageTime won't be updated.
+     */
+    test("same message is returned from cache instead of passed through openAi", async () => {
+      mockOpenAi({
+        completionsPromise: new Promise((resolve) => {
+          resolve(openAiMockCompletion);
+        }),
+      });
 
-    test("when fails, returns the 'sorry' message", () => {});
+      openAiManager.waitTimeLimit = 0;
+      await openAiManager.prompt(userPrompt, userName);
+
+      const time = openAiManager._lastMessageTime;
+
+      await openAiManager.prompt(userPrompt, userName);
+      assert.ok(openAiManager._lastMessageTime === time);
+    });
+
+    test("spam prevention mechanism prevents sending messages for more than 3 seconds", async () => {
+      mockOpenAi({
+        completionsPromise: new Promise((resolve) => {
+          resolve(openAiMockCompletion);
+        }),
+      });
+
+      await openAiManager.prompt(userPrompt, userName);
+
+      const response = await openAiManager.prompt(userPrompt + userPrompt, userName);
+      assert.deepEqual(response, "");
+    });
+
+    test("when fails, returns the 'sorry' message", async () => {
+      mockOpenAi({
+        completionsPromise: new Promise((resolve, reject) => {
+          reject();
+        }),
+      });
+      const response = await openAiManager.prompt(userPrompt, userName);
+      assert.deepEqual(response, "Sorry, something went wrong. Please try again later.");
+    });
   });
 });
