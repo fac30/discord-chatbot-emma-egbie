@@ -4,6 +4,8 @@ const dotenv = require("dotenv").config();
 const { test, describe, beforeEach } = require("node:test");
 const OpenAiManager = require("../src/OpenAiManager");
 
+const openAiMockResponse = require("./openAiMock.json");
+
 const API_TEST_KEY = "123";
 
 describe("environment variables", () => {
@@ -149,3 +151,40 @@ describe("_constructMessage", () => {
     assert.deepEqual(userMessagesCount, 1);
   });
 });
+
+describe("_generateReply", () => {
+  /** @type {OpenAiManager} */
+  let openAiManager;
+
+  const mockOpenAi = (promise) => {
+    openAiManager._openAi = { chat: { completions: { create: () => promise } } };
+  };
+
+  beforeEach(() => {
+    openAiManager = new OpenAiManager(API_TEST_KEY);
+  });
+
+  test("extracts reply correctly from openAi response", async () => {
+    mockOpenAi(
+      new Promise((resolve) => {
+        resolve(openAiMockResponse);
+      })
+    );
+    const reply = await openAiManager._generateReply([]);
+
+    assert.deepEqual(reply, openAiMockResponse.choices[0].message.content);
+  });
+
+  test("returns empty string when api call fails", async () => {
+    mockOpenAi(
+      new Promise((resolve, reject) => {
+        reject();
+      })
+    );
+
+    const reply = await openAiManager._generateReply([]);
+    assert.deepEqual(reply, "");
+  });
+});
+
+describe("prompt", () => {});

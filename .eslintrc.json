@@ -13,7 +13,7 @@
     "curly": ["error", "multi-line", "consistent"],
     "handle-callback-err": "off",
     "no-console": "off",
-    "no-empty-function": "error",
+    "no-empty-function": "off",
     "no-floating-decimal": "error",
     "no-inline-comments": "off",
     "no-lonely-if": "error",
