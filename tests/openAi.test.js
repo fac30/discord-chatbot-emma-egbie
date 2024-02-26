@@ -187,4 +187,48 @@ describe("_generateReply", () => {
   });
 });
 
+describe("updateCache", () => {
+  /** @type {OpenAiManager} */
+  let openAiManager;
+  const userName = "userName";
+  const testPrompt = "testPrompt";
+  const testResponse = "testResponse";
+
+  beforeEach(() => {
+    openAiManager = new OpenAiManager(API_TEST_KEY);
+    openAiManager.updateCache(userName, testPrompt, testResponse);
+  });
+
+  test("creates a new cache entry for a new user", () => {
+    assert.deepEqual(openAiManager._cache.userName.testPrompt, testResponse);
+  });
+
+  test("updates the cache cache entry for an existing user", () => {
+    const secondTestPrompt = "secondTestPrompt";
+    const secondTestResponse = "secondTestResponse";
+    openAiManager.updateCache(userName, secondTestPrompt, secondTestResponse);
+    assert.deepEqual(openAiManager._cache.userName.secondTestPrompt, secondTestResponse);
+  });
+});
+
+describe("_updateLastMessageTime", () => {
+  /** @type {OpenAiManager} */
+  let openAiManager;
+  beforeEach(() => {
+    openAiManager = new OpenAiManager(API_TEST_KEY);
+  });
+
+  test("lastMessageTime is null to begin with", () => {
+    assert.deepEqual(openAiManager._lastMessageTime, null);
+  });
+
+  test("lastMessageTime is null to begin with", () => {
+    const timeNow = Date.now();
+    openAiManager._updateLastMessageTime(timeNow);
+    assert.deepEqual(openAiManager._lastMessageTime, timeNow);
+  });
+});
+
 describe("prompt", () => {});
+
+describe("moderatePrompt", () => {});
