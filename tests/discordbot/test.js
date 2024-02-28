@@ -5,7 +5,9 @@ const sinon      = require('sinon');
 const dotenv     = require("dotenv").config();
 const BotManager = require('../../src/BotManager.js');
 
-const { parseUserMentionAndMessage } = require("../../src/utils.js")
+const { parseUserMentionAndMessage } = require("../../src/utils.js");
+const MockMessages                   = require('../mocks/mockMessages.js');
+const MockUser                       = require("../mocks/mockUser.js");
 
 const DISCORD_BOT_TOKEN = dotenv.parsed.DISCORD_BOT_TOKEN;
 const SERVER_ID         = dotenv.parsed.SERVER_ID;
@@ -20,8 +22,10 @@ class BotManagerTestSuite {
      * Constructs a new BotManagerTestSuite.
      */
     constructor() {
-        this.botManager = null;
-        this._dateNow = new Date();
+        this.discordBot    = null;
+        this._dateNow      = new Date();
+        this._mockMessages = new MockMessages();
+        this._mockUser     = new MockUser("fake ID", "Test Bot", "Test Bot global");
         this.setup();
     }
 
@@ -35,7 +39,7 @@ class BotManagerTestSuite {
     tearDown() {
         this.discordBot.logout();
     }
-
+    
     /**
     * Tests the successful initialization of the bot.
     * 
@@ -115,6 +119,8 @@ class BotManagerTestSuite {
         }
     }
 
+
+    
     /**
      * Test if a new Discord bot successfully logs into the server and announces its presence.
      * This test ensures that the bot manager correctly handles the login process and sets up
@@ -229,6 +235,11 @@ class BotManagerTestSuite {
         }
     }
 
+    async testSendDirectMessageToUser() {
+      
+        // TODO
+    }
+
     /**
      * Simulates the event message handling process of the bot in a test environment.
      * This function creates a mock message, logs in the bot, stubs the necessary methods
@@ -244,7 +255,7 @@ class BotManagerTestSuite {
      * of the bot.
      */
     async _testBotResponseEventMessageHelperFunction() {
-        const message = this._mockMessage;
+        const message = this._mockMessages.sentMessage;
         const testBot = new BotManager(DISCORD_BOT_TOKEN, SERVER_ID, "OPEN_AI_KEY");
 
         await testBot.login();
@@ -270,7 +281,8 @@ class BotManagerTestSuite {
         return response;
     }
 
-    
+   
+
     /**
      * Mocks the behavior of the `_onMessageCreate` method in the BotManager class.
      * This method is used to simulate the response of the bot when a message is created.
@@ -304,64 +316,10 @@ class BotManagerTestSuite {
             //TODO - Add functionality to do something later for now just return a string
             return "The message has been successfully sent";
         } else if (userId && messageContent && message) {
-
-            return this._mockRecievedMessage;
+            return this._mockMessages.receivedMessage;
         }
     }
 
-    /**
-     * Returns a mock message object representing a received message.
-     * @returns {object} A mock message object.
-    */
-    get _mockRecievedMessage() {
-        return {
-            channelId: 'mock channel id',
-            guildId: 'mock guild id',
-            id: 'mock id',
-            createdTimestamp: this._dateNow,
-            type: 0,
-            system: false,
-            content: '<@733473713210785812> Hello',
-
-            application: {
-                id: "mock application id",
-            },
-
-            author: {
-                id: 'mock author id',
-                bot: true,
-            },
-
-            mentions: {
-                has: (userID) => {
-                    return userID === "mock User ID";
-                }
-            }
-        }
-    }
-
-    /**
-     * Generates a mock message object for testing purposes.
-     * 
-     * @returns {Object} A mock message object with predefined properties.
-     */
-    get _mockMessage() {
-
-        return {
-            channelId: '1210569481391448066',
-            guildId: '1210569480749457428',
-            id: '1210613247498002442',
-            createdTimestamp: this._dateNow,
-            type: 0,
-            system: false,
-            content: '<@733473713210785812> what are you?',
-
-            author: {
-                id: 'mock author id',
-                bot: false,
-            }
-        }
-    }
 
 /**
  * Runs all tests in the suite.
@@ -418,8 +376,19 @@ async runTests() {
             });
         });
 
+        //  // Test bot ability to send direct messsages to users
+        //  await test.describe("testSendDirectMessageToUser", async () => {
+        //     test("The bot should be able to send message directly to a user", async () => {
+        //         await this.testSendDirectMessageToUser();
+        //     });
+        // });
+
+
+
     } catch (error) {
         console.log("[-] Something went wrong with running the tests!!")
+    } finally {
+        this.tearDown();
     }
 }
 
