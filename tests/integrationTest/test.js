@@ -143,7 +143,7 @@ class IntegrationTestSuite {
             return await this._mockOnMessageCreate(message);
         });
 
-        // When called it will replace the actually message without fake message
+        // When called it will replace the actually message with the fake message
         const response = await this.testBot._onMessageCreate(message);
 
         // Restore the stubbed method
