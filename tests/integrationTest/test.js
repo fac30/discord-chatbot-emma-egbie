@@ -13,7 +13,11 @@ const { parseUserMentionAndMessage } = require("../../src/utils.js");
 
 
 
-
+/**
+ * IntegrationTestSuite class for testing the integration of various components.
+ * This class provides methods to perform integration tests on the interactions 
+ * between a Discord bot, an OpenAI manager, and other related components.
+ */
 class IntegrationTestSuite {
     constructor(DISCORD_BOT_TOKEN="DISCORD_BOT_TOKEN", SERVER_ID="SERVER_ID", OPEN_AI_KEY="OPEN_AI_KEY") {
         
