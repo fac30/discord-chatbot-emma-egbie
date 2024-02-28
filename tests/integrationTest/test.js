@@ -192,7 +192,7 @@ class IntegrationTestSuite {
         }
     }
 
-    test__generateFieldsFromQAPairsMethod__WhenChatHistoryIsEmpty() {
+    testGenerateFieldsFromQAPairsMethod__WhenChatHistoryIsEmpty() {
         this._clearOpenAiCache();
         const expectedResult = [];
 
@@ -307,7 +307,7 @@ class IntegrationTestSuite {
         // Test that an empty array is returned if the  _generateFieldsFromQAPairs method is called with an empty chat history
          test.describe("_generateFieldsFromQAPairs", () => {
             test.describe("Test that an empty array is returned if the _generateFieldsFromQAPairs method is called with an empty chat history", () => {
-                this.test__generateFieldsFromQAPairsMethod__WhenChatHistoryIsEmpty();
+                this.testGenerateFieldsFromQAPairsMethod__WhenChatHistoryIsEmpty();
             });
         });
 
