@@ -4,35 +4,31 @@
 // Usage:
 // Import the test suites.
 // const DiscordBotTestSuite = require('./discordbot/test.js');
-// const OpenAiTestSuite = require('./openaiTest/test.js');
 // const IntegrationTestSuite = require('./integrationTest/test.js');
 
 // Initialize the test suites.
 // const botTestSuite = new DiscordBotTestSuite();
-// const openAiTestSuite = new OpenAiTestSuite();
 // const integrationTestSuite = new IntegrationTestSuite();
 
 // Run all test suites.
 // botTestSuite.runTests();
-// openAiTestSuite.runTests();
 // integrationTestSuite.runTests();
 
 // To run the tests, navigate to the test folder and run:
 // node ./mainTestFile.js
+//
+// To run openai test navigate to folder and do the same command
+// node ./openAitest.js
 
-// Importing the DiscordBotTestSuite from the discordbot folder
+// Importing the test suites
 const DiscordBotTestSuite = require("./discordbot/test.js");
-
-// Importing other test suites if needed - uncomment this once the appropriate classes have been created
-// const OpenAiTestSuite = require('./openaiTest/test.js');
-// const IntegrationTestSuite = require('./integrationTest/test.js');
+const IntegrationTestSuite = require('./integrationTest/test.js');
 
 // Initialize test suites
 const botTestSuite = new DiscordBotTestSuite();
-// const openAiTestSuite = new OpenAiTestSuite();
-// const integrationTestSuite = new IntegrationTestSuite();
+const integrationTestSuite = new IntegrationTestSuite();
 
-// Run all test suites
-botTestSuite.runTests();
-require("./openAi/openAi.test.js");
-// integrationTestSuite.runTests();
+// Run all test suites or uncomment the one you want to run
+// botTestSuite.runTests();
+
+integrationTestSuite.runTests();
