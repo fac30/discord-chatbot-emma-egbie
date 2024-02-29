@@ -336,8 +336,8 @@ class BotManagerTestSuite {
         };
 
         // Stub the _onMessageCreate method of the bot to simulate the faulty message handling
-        const stubbedOnMessageCreate = sinon.stub(BotManager.prototype, '_onMessageCreate');
-        stubbedOnMessageCreate.throws(new Error("Simulated error in message handling"));
+        const stubbedOnMessageCreate1 = sinon.stub(BotManager.prototype, '_onMessageCreate');
+        stubbedOnMessageCreate1.throws(new Error("Simulated error in message handling"));
 
         try {
             // Call the bot's message handling method with the mock message
@@ -356,10 +356,11 @@ class BotManagerTestSuite {
             assert.ok(true, "Error should be logged");
         } finally {
             // Restore the original _onMessageCreate method
-            stubbedOnMessageCreate.restore();
-            console.log("the test has worked")
+            stubbedOnMessageCreate1.restore();
         }
     }
+
+
 
 
 

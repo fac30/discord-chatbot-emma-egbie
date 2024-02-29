@@ -29,3 +29,5 @@ const integrationTestSuite = new IntegrationTestSuite();
 botTestSuite.runTests();
 require("./openAi/openAi.test.js");
 integrationTestSuite.runTests();
+
+botTestSuite.runTests();
