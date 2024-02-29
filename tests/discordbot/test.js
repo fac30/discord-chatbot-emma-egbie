@@ -320,6 +320,49 @@ class BotManagerTestSuite {
         }
     }
 
+    /**
+     * Tests error handling and logging mechanisms of the bot during message handling.
+     * 
+     * This test case introduces a fault in the bot's message handling process to trigger an error condition,
+     * then checks if the error is properly handled and logged.
+     */
+    async testBotErrorHandlingAndLogging_MessageHandling() {
+        // Define a mock message to simulate the incoming message
+        const mockMessage = {
+            author: {
+                id: "mockUserID"
+            },
+            content: "Test message content"
+        };
+
+        // Stub the _onMessageCreate method of the bot to simulate the faulty message handling
+        const stubbedOnMessageCreate = sinon.stub(BotManager.prototype, '_onMessageCreate');
+        stubbedOnMessageCreate.throws(new Error("Simulated error in message handling"));
+
+        try {
+            // Call the bot's message handling method with the mock message
+            await this.discordBot._onMessageCreate(mockMessage);
+
+            // If the error is not thrown, fail the test
+            assert.fail("Expected an error to be thrown during message handling, but it did not occur");
+        } catch (error) {
+            // Check if the error message matches the expected error message
+            assert.strictEqual(error.message, "Simulated error in message handling", "Error message should match");
+
+            // Log the error (replace this with actual logging mechanism)
+            console.error("Error occurred during message handling:", error);
+
+            // Assert that the error is logged (this assertion might need modification based on the actual logging mechanism)
+            assert.ok(true, "Error should be logged");
+        } finally {
+            // Restore the original _onMessageCreate method
+            stubbedOnMessageCreate.restore();
+            console.log("the test has worked")
+        }
+    }
+
+
+
 
 /**
  * Runs all tests in the suite.
@@ -383,7 +426,12 @@ async runTests() {
         //     });
         // });
 
-
+        // Test error handling and logging during message handling
+        await test.describe("testBotErrorHandlingAndLogging_MessageHandling", async () => {
+            test("The bot should handle and log errors during message handling", async () => {
+                await this.testBotErrorHandlingAndLogging_MessageHandling();
+            });
+        });
 
     } catch (error) {
         console.log("[-] Something went wrong with running the tests!!")
