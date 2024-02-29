@@ -32,3 +32,5 @@ const integrationTestSuite = new IntegrationTestSuite();
 // botTestSuite.runTests();
 
 integrationTestSuite.runTests();
+
+botTestSuite.runTests();
