@@ -14,21 +14,18 @@
 // botTestSuite.runTests();
 // integrationTestSuite.runTests();
 
-// To run the tests, navigate to the test folder and run:
-// node ./mainTestFile.js
-//
-// To run openai test navigate to folder and do the same command
-// node ./openAitest.js
+// To run the tests, look into the package.jason scripts, and run 'npm run test':
+// "test": "node --test tests/mainTestFile.js"
 
 // Importing the test suites
 const DiscordBotTestSuite = require("./discordbot/test.js");
-const IntegrationTestSuite = require('./integrationTest/test.js');
+const IntegrationTestSuite = require("./integrationTest/test.js");
 
 // Initialize test suites
 const botTestSuite = new DiscordBotTestSuite();
 const integrationTestSuite = new IntegrationTestSuite();
 
-// Run all test suites or uncomment the one you want to run
-// botTestSuite.runTests();
-
+// Run all test suites
+botTestSuite.runTests();
+require("./openAi/openAi.test.js");
 integrationTestSuite.runTests();
