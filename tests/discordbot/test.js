@@ -349,9 +349,6 @@ class BotManagerTestSuite {
             // Check if the error message matches the expected error message
             assert.strictEqual(error.message, "Simulated error in message handling", "Error message should match");
 
-            // Log the error (replace this with actual logging mechanism)
-            console.error("Error occurred during message handling:", error);
-
             // Assert that the error is logged (this assertion might need modification based on the actual logging mechanism)
             assert.ok(true, "Error should be logged");
         } finally {
@@ -359,10 +356,6 @@ class BotManagerTestSuite {
             stubbedOnMessageCreate1.restore();
         }
     }
-
-
-
-
 
 
 /**
