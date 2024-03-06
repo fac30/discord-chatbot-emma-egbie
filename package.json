@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "nodemon src/index.js",
+    "start-once": "node src/index.js",
     "test": "node --test tests/mainTestFile.js",
     "test-openai": "nodemon --test tests/openAi/openai.test.js"
   },
