@@ -37,7 +37,6 @@ class BotManager {
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-      
       ],
     });
 
@@ -59,15 +58,13 @@ class BotManager {
     this._client.on(Events.MessageCreate, this._onMessageCreate.bind(this));
     this._client.on(Events.GuildMemberAdd, this._announceNewMember.bind(this));
     this._client.on(Events.GuildMemberRemove, this._announceMemberLeave.bind(this));
-  
   }
 
-
   /**
- * Logs the bot into Discord.
- * 
- * @returns {Promise} A promise that resolves when the bot is initialized, or rejects if login fails.
- */
+   * Logs the bot into Discord.
+   *
+   * @returns {Promise} A promise that resolves when the bot is initialized, or rejects if login fails.
+   */
   login() {
     if (this._initialized) {
       return Promise.resolve(); // Resolve immediately if already initialized
@@ -75,18 +72,16 @@ class BotManager {
 
     return new Promise((resolve, reject) => {
       this._client.once(Events.ClientReady, () => {
-
         this._initialized = true;
         const botName = this._client.user.displayName;
         this._openAi.setName(botName); //set to the openAi class
-        this.setBotname(botName);      // set to the botManager class 
+        this.setBotname(botName); // set to the botManager class
         this._announcePresence();
         resolve();
       });
 
       // Login to Discord
-      this._client.login(this._discordBotToken)
-        .catch(reject);
+      this._client.login(this._discordBotToken).catch(reject);
     });
   }
 
@@ -95,7 +90,6 @@ class BotManager {
    * @private
    */
   async _announcePresence() {
-
     const msg =
       `Hello everyone! I'm the **${this.botName}**, now online and ready to chat. To chat with me, ` +
       `**type @${this.botName} followed by your prompt**. ` +
@@ -133,13 +127,14 @@ class BotManager {
       this._lastMessageTime && currentTime - this._lastMessageTime < waitTimeLimit;
 
     const { userId, messageContent } = parseUserMentionAndMessage(content);
-    let isDirectMessage = userId != this._client.application.id && messageContent && !this._isTextInExcludeList(messageContent);
+    let isDirectMessage =
+      userId != this._client.application.id &&
+      messageContent &&
+      !this._isTextInExcludeList(messageContent);
 
     if (author !== this._client.application.id) {
-
-     
       this._moderateUserPrompt(content, message, isDirectMessage);
-      
+
       switch (true) {
         case isDirectMessage:
           this._sendDirectMessageToUser(userId, messageContent);
@@ -175,7 +170,7 @@ class BotManager {
    */
   async _moderateUserPrompt(content, message, isDirectMessage = false) {
     const moderations = await this._openAi.moderatePrompt(content);
-    const {userId, messageContent} = parseUserMentionAndMessage(content);
+    const { userId, messageContent } = parseUserMentionAndMessage(content);
 
     if (moderations.length) {
       this._sendWarningModerationMessage(moderations.join(", "), message.author, messageContent);
@@ -237,7 +232,6 @@ class BotManager {
    * @param {string} message - The content of the message to be sent.
    */
   _sendDirectMessageToUser(userID, message) {
-
     const user = this._getUserByID(userID);
 
     if (!user) {
@@ -245,7 +239,8 @@ class BotManager {
       return;
     }
 
-    user.send(message)
+    user
+      .send(message)
       .then(() => {
         console.log("The message was sent successfully.");
       })
@@ -297,7 +292,10 @@ class BotManager {
 
     // Check if there's no chat history available
     if (!chatHistory.length) {
-      return await this._sendToChannel(this.defaultChannel, "There are no chats to view!");
+      return await this._sendToChannel(
+        message.channel || this.defaultChannel,
+        "There are no chats to view!"
+      );
     }
 
     const loadingMessage = await this._sendToChannel(
@@ -420,7 +418,8 @@ class BotManager {
    */
   _deleteMsg(message, reason = "Your message has been deleted because it violates OpenAi rules") {
     if (message) {
-      message.delete()
+      message
+        .delete()
         .then(() => {
           this._sendToChannel(this.defaultChannel, reason);
         })
@@ -438,7 +437,7 @@ class BotManager {
       if (this._client) {
         await this._client.destroy();
       }
-      
+
       console.log("Bot logged out successfully.");
     } catch (error) {
       console.error("Error logging out:", error);
@@ -446,26 +445,35 @@ class BotManager {
   }
   /**
    * Sets the name of the bot to the botManager class.
-   * 
+   *
    * @param {string} botName - The name to set for the bot.
    */
   setBotname(botName) {
     this.botName = botName;
   }
 
- 
   /**
    * Retrieves a Discord user object by user ID.
-   * 
+   *
    * @param {string} userID - The ID of the user to retrieve.
    * @returns {User | undefined} - The user object corresponding to the provided ID, or undefined if not found.
- */
+   */
   _getUserByID(userID) {
     return this._client.users.cache?.get(userID);
   }
 
   get defaultChannel() {
-    return this.guild && this.guild.id === this._serverID ? this.guild?.systemChannel : null;
+    let generalChannel = null;
+    for (const [, channel] of this.guild.channels.cache) {
+      if (channel instanceof TextChannel && channel.name.toLowerCase() === "general") {
+        generalChannel = channel;
+      }
+    }
+    if (generalChannel) {
+      return generalChannel;
+    } else {
+      return this.guild && this.guild.id === this._serverID ? this.guild?.systemChannel : null;
+    }
   }
 
   get guild() {
